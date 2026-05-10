@@ -1,4 +1,5 @@
 pub mod message;
+pub mod mod_helpers;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -11,6 +12,7 @@ use crate::config::model::{
   Config, DeployMode, KeyType, Service, ServiceParams, ServiceType, SshKey,
 };
 use crate::error::AppError;
+use crate::health::HealthSnapshot;
 use crate::secrets::model::Secrets;
 use crate::subprocess::gpg::GpgKeyInfo;
 use crate::subprocess::ssh_keygen::ProtectionStatus;
@@ -53,6 +55,8 @@ pub struct ReadyState {
   pub deploy: Option<DeployState>,
   pub key_protection: HashMap<Uuid, ProtectionStatus>,
   pub add_passphrase: Option<AddPassphraseState>,
+  pub revoke: Option<RevokeState>,
+  pub health: HealthSnapshot,
 }
 
 /// Étapes du flux de déploiement.
@@ -61,7 +65,8 @@ pub enum DeployStep {
   ChooseMode,
   AutoDeploying,
   GuidedCommand { command: String },
-  Success,
+  Verifying,
+  Success { verified: bool },
   Error(String),
 }
 
@@ -121,6 +126,22 @@ pub struct AddPassphraseState {
   pub status: AddPassphraseStatus,
 }
 
+/// Statut d'une révocation de clef SSH.
+#[derive(Debug, Clone)]
+pub enum RevokeStatus {
+  Revoking,
+  Success,
+  Error(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct RevokeState {
+  #[allow(dead_code)]
+  pub service_id: Uuid,
+  pub key_id: Uuid,
+  pub status: RevokeStatus,
+}
+
 /// État du formulaire de création/édition de service.
 #[derive(Debug, Clone, Default)]
 pub struct ServiceFormState {
@@ -131,6 +152,7 @@ pub struct ServiceFormState {
   pub user: String,
   pub port: String,
   pub deploy_mode: DeployMode,
+  pub token_value: String,
   pub editing_id: Option<Uuid>,
   pub error: Option<String>,
 }
@@ -158,6 +180,7 @@ impl ServiceFormState {
         .map(|p| p.to_string())
         .unwrap_or_else(|| "22".to_string()),
       deploy_mode: service.deploy_mode.clone(),
+      token_value: String::new(), // token non réaffiché par sécurité
       editing_id: Some(service.id),
       error: None,
     }
@@ -172,6 +195,7 @@ impl ServiceFormState {
       FormField::User(v) => self.user = v,
       FormField::Port(v) => self.port = v,
       FormField::DeployMode(v) => self.deploy_mode = v,
+      FormField::Token(v) => self.token_value = v,
     }
   }
 
@@ -185,6 +209,13 @@ impl ServiceFormState {
       Some(ServiceType::SshGeneric)
         | Some(ServiceType::GitLabSelfHosted)
         | Some(ServiceType::Manual)
+    )
+  }
+
+  pub fn needs_api_token(&self) -> bool {
+    matches!(
+      self.service_type,
+      Some(ServiceType::GitHub) | Some(ServiceType::GitLab) | Some(ServiceType::GitLabSelfHosted)
     )
   }
 
@@ -227,15 +258,31 @@ impl ServiceFormState {
           Some(self.user.clone())
         },
         port,
-        token_ref: None,
+        token_ref: if self.needs_api_token() && !self.token_value.is_empty() {
+          Some(sanitize_token_ref(&self.name))
+        } else {
+          None
+        },
       },
       active_key: None,
       pending_key: None,
       created_at: chrono::Local::now().date_naive(),
       last_rotation: None,
       deploy_mode: self.deploy_mode.clone(),
+      deployments: vec![],
     })
   }
+}
+
+fn sanitize_token_ref(name: &str) -> String {
+  mod_helpers::sanitize_token_ref_pub(name)
+}
+
+/// Recalcule le HealthSnapshot depuis l'état courant du ReadyState.
+fn recompute_health(s: &mut ReadyState) {
+  let all_keys: Vec<&SshKey> = s.config.keys.iter().chain(s.local_keys.iter()).collect();
+  let all_keys_owned: Vec<SshKey> = all_keys.into_iter().cloned().collect();
+  s.health = HealthSnapshot::compute(&s.config, &all_keys_owned, &s.key_protection);
 }
 
 /// Infère le chemin de la clef privée depuis une SshKey.
@@ -348,6 +395,7 @@ impl App {
               Message::KeysProtectionChecked,
             );
           }
+          recompute_health(s);
         }
         Task::none()
       }
@@ -545,30 +593,73 @@ impl App {
       }
 
       Message::SubmitServiceForm => {
-        if let AppState::Ready(ref s) = self.state {
-          if let Some(ref form) = s.form {
-            match form.build() {
-              Ok(service) => {
-                let mut config = s.config.clone();
-                let editing_id = form.editing_id;
-                if let Some(id) = editing_id {
-                  if let Some(pos) = config.services.iter().position(|svc| svc.id == id) {
-                    config.services[pos] = service;
-                  }
-                } else {
-                  config.services.push(service);
+        // Phase 1 : collecter les données sans borrow mutable
+        let extracted = match &self.state {
+          AppState::Ready(s) => s.form.as_ref().map(|form| {
+            let build = form.build();
+            let has_token = form.needs_api_token() && !form.token_value.is_empty();
+            let token_name = sanitize_token_ref(&form.name);
+            let token_value = form.token_value.clone();
+            let editing_id = form.editing_id;
+            let gpg_fp = s.config.gpg.key_fingerprint.clone().unwrap_or_default();
+            let secrets_path = s
+              .config
+              .gpg
+              .secrets_path
+              .clone()
+              .unwrap_or_else(|| crate::secrets::secrets_path_default().expect("config dir"));
+            (
+              build,
+              has_token,
+              token_name,
+              token_value,
+              editing_id,
+              gpg_fp,
+              secrets_path,
+            )
+          }),
+          _ => None,
+        };
+
+        let Some((build, has_token, token_name, token_value, editing_id, gpg_fp, secrets_path)) =
+          extracted
+        else {
+          return Task::none();
+        };
+
+        match build {
+          Ok(service) => {
+            if let AppState::Ready(ref mut s) = self.state {
+              let mut config = s.config.clone();
+              if let Some(id) = editing_id {
+                if let Some(pos) = config.services.iter().position(|svc| svc.id == id) {
+                  config.services[pos] = service;
                 }
-                return Task::perform(
-                  crate::config::writer::save_config_owned(config),
-                  Message::ServiceSaved,
-                );
+              } else {
+                config.services.push(service);
               }
-              Err(msg) => {
-                if let AppState::Ready(ref mut s) = self.state {
-                  if let Some(ref mut form) = s.form {
-                    form.error = Some(msg);
-                  }
-                }
+
+              let config_task = Task::perform(
+                crate::config::writer::save_config_owned(config),
+                Message::ServiceSaved,
+              );
+
+              if has_token {
+                s.secrets.tokens.insert(token_name, token_value);
+                let secrets = s.secrets.clone();
+                let token_task = Task::perform(
+                  async move { crate::secrets::save_ref(&secrets, &gpg_fp, &secrets_path).await },
+                  Message::TokenSaved,
+                );
+                return Task::batch([config_task, token_task]);
+              }
+              return config_task;
+            }
+          }
+          Err(msg) => {
+            if let AppState::Ready(ref mut s) = self.state {
+              if let Some(ref mut form) = s.form {
+                form.error = Some(msg);
               }
             }
           }
@@ -580,6 +671,7 @@ impl App {
         if let AppState::Ready(ref mut s) = self.state {
           s.config = config;
           s.form = None;
+          recompute_health(s);
         }
         Task::none()
       }
@@ -591,6 +683,13 @@ impl App {
             form.error = Some(format!("Erreur de sauvegarde : {e}"));
           }
         }
+        Task::none()
+      }
+
+      Message::TokenSaved(Ok(())) => Task::none(),
+
+      Message::TokenSaved(Err(e)) => {
+        tracing::warn!("Sauvegarde token échouée : {e}");
         Task::none()
       }
 
@@ -644,6 +743,7 @@ impl App {
       Message::KeyAssigned(Ok(config)) => {
         if let AppState::Ready(ref mut s) = self.state {
           s.config = config;
+          recompute_health(s);
         }
         Task::none()
       }
@@ -764,6 +864,7 @@ impl App {
       Message::KeySaved(Ok(config)) => {
         if let AppState::Ready(ref mut s) = self.state {
           s.config = config;
+          recompute_health(s);
         }
         Task::none()
       }
@@ -869,21 +970,59 @@ impl App {
 
       Message::DeployCompleted(Ok(())) => {
         if let AppState::Ready(ref mut s) = self.state {
-          // Mise à jour last_rotation
           let service_id = s.deploy.as_ref().map(|d| d.service_id);
+          let key_id = s.deploy.as_ref().map(|d| d.key_id);
+
           if let Some(sid) = service_id {
             if let Some(svc) = s.config.services.iter_mut().find(|sv| sv.id == sid) {
               svc.last_rotation = Some(chrono::Local::now().date_naive());
             }
           }
-          if let Some(ref mut d) = s.deploy {
-            d.step = DeployStep::Success;
-          }
+
+          // Collecter les données pour la vérification SSH
+          let verify_params = key_id.and_then(|kid| {
+            let svc = s
+              .config
+              .services
+              .iter()
+              .find(|sv| Some(sv.id) == service_id)?;
+            let key = s
+              .local_keys
+              .iter()
+              .chain(s.config.keys.iter())
+              .find(|k| k.id == kid)?;
+            let host = svc.params.url.clone()?;
+            let user = svc.params.user.clone()?;
+            let port = svc.params.port.unwrap_or(22);
+            let priv_path = key.private_path.clone()?;
+            Some((priv_path, user, host, port))
+          });
+
           let config = s.config.clone();
-          return Task::perform(
+          let save_task = Task::perform(
             crate::config::writer::save_config_owned(config),
             Message::DeployAndSaved,
           );
+
+          if let Some((priv_path, user, host, port)) = verify_params {
+            if let Some(ref mut d) = s.deploy {
+              d.step = DeployStep::Verifying;
+            }
+            let verify_task = Task::perform(
+              async move {
+                crate::subprocess::ssh_copy_id::verify_connection(&priv_path, &user, &host, port)
+                  .await
+              },
+              Message::VerifyCompleted,
+            );
+            return Task::batch([save_task, verify_task]);
+          } else {
+            // Service API ou clef sans chemin privé — vérification non applicable
+            if let Some(ref mut d) = s.deploy {
+              d.step = DeployStep::Success { verified: false };
+            }
+            return save_task;
+          }
         }
         Task::none()
       }
@@ -898,22 +1037,75 @@ impl App {
         Task::none()
       }
 
+      Message::VerifyCompleted(result) => {
+        if let AppState::Ready(ref mut s) = self.state {
+          let verified = match result {
+            Ok(v) => v,
+            Err(e) => {
+              tracing::warn!("Vérification post-déploiement échouée (non bloquant) : {e}");
+              false
+            }
+          };
+          if let Some(ref mut d) = s.deploy {
+            d.step = DeployStep::Success { verified };
+          }
+        }
+        Task::none()
+      }
+
       Message::GuidedDeployConfirmed => {
         if let AppState::Ready(ref mut s) = self.state {
           let service_id = s.deploy.as_ref().map(|d| d.service_id);
+          let key_id = s.deploy.as_ref().map(|d| d.key_id);
+
           if let Some(sid) = service_id {
             if let Some(svc) = s.config.services.iter_mut().find(|sv| sv.id == sid) {
               svc.last_rotation = Some(chrono::Local::now().date_naive());
             }
           }
-          if let Some(ref mut d) = s.deploy {
-            d.step = DeployStep::Success;
-          }
+
+          let verify_params = key_id.and_then(|kid| {
+            let svc = s
+              .config
+              .services
+              .iter()
+              .find(|sv| Some(sv.id) == service_id)?;
+            let key = s
+              .local_keys
+              .iter()
+              .chain(s.config.keys.iter())
+              .find(|k| k.id == kid)?;
+            let host = svc.params.url.clone()?;
+            let user = svc.params.user.clone()?;
+            let port = svc.params.port.unwrap_or(22);
+            let priv_path = key.private_path.clone()?;
+            Some((priv_path, user, host, port))
+          });
+
           let config = s.config.clone();
-          return Task::perform(
+          let save_task = Task::perform(
             crate::config::writer::save_config_owned(config),
             Message::DeployAndSaved,
           );
+
+          if let Some((priv_path, user, host, port)) = verify_params {
+            if let Some(ref mut d) = s.deploy {
+              d.step = DeployStep::Verifying;
+            }
+            let verify_task = Task::perform(
+              async move {
+                crate::subprocess::ssh_copy_id::verify_connection(&priv_path, &user, &host, port)
+                  .await
+              },
+              Message::VerifyCompleted,
+            );
+            return Task::batch([save_task, verify_task]);
+          } else {
+            if let Some(ref mut d) = s.deploy {
+              d.step = DeployStep::Success { verified: false };
+            }
+            return save_task;
+          }
         }
         Task::none()
       }
@@ -921,6 +1113,7 @@ impl App {
       Message::DeployAndSaved(Ok(config)) => {
         if let AppState::Ready(ref mut s) = self.state {
           s.config = config;
+          recompute_health(s);
         }
         Task::none()
       }
@@ -936,6 +1129,7 @@ impl App {
           for (id, status) in results {
             s.key_protection.insert(id, status);
           }
+          recompute_health(s);
         }
         Task::none()
       }
@@ -1019,6 +1213,107 @@ impl App {
             aps.status = AddPassphraseStatus::Error(e.to_string());
           }
         }
+        Task::none()
+      }
+
+      // ── Révocation de clef ─────────────────────────────────────
+      Message::StartRevoke { service_id, key_id } => {
+        // Collecte des données sans borrow mutable
+        let revoke_data = match &self.state {
+          AppState::Ready(s) => (|| {
+            let svc = s.config.services.iter().find(|sv| sv.id == service_id)?;
+            let host = svc.params.url.clone()?;
+            let user = svc.params.user.clone()?;
+            let port = svc.params.port.unwrap_or(22);
+            // On SSH avec la clef active courante
+            let active_id = svc.active_key?;
+            let active_key = s
+              .local_keys
+              .iter()
+              .chain(s.config.keys.iter())
+              .find(|k| k.id == active_id)?;
+            let priv_path = active_key.private_path.clone()?;
+            // Fingerprint de la clef à révoquer
+            let old_key = s.config.keys.iter().find(|k| k.id == key_id)?;
+            Some((priv_path, old_key.fingerprint.clone(), user, host, port))
+          })(),
+          _ => None,
+        };
+
+        if let AppState::Ready(ref mut s) = self.state {
+          if let Some((priv_path, fingerprint, user, host, port)) = revoke_data {
+            s.revoke = Some(RevokeState {
+              service_id,
+              key_id,
+              status: RevokeStatus::Revoking,
+            });
+            return Task::perform(
+              async move {
+                crate::subprocess::ssh_copy_id::revoke_key(
+                  &priv_path,
+                  &fingerprint,
+                  &user,
+                  &host,
+                  port,
+                )
+                .await
+              },
+              Message::RevokeCompleted,
+            );
+          } else {
+            tracing::warn!("StartRevoke : impossible de collecter les données (service non SSH ou clef sans chemin privé)");
+            s.revoke = Some(RevokeState {
+              service_id,
+              key_id,
+              status: RevokeStatus::Error(
+                "Révocation impossible : service non SSH ou clef active sans chemin privé.".into(),
+              ),
+            });
+          }
+        }
+        Task::none()
+      }
+
+      Message::RevokeCompleted(Ok(())) => {
+        if let AppState::Ready(ref mut s) = self.state {
+          if let Some(ref r) = s.revoke {
+            // Retirer la clef révoquée de config.keys
+            let key_id = r.key_id;
+            s.config.keys.retain(|k| k.id != key_id);
+            s.local_keys.retain(|k| k.id != key_id);
+          }
+          if let Some(ref mut r) = s.revoke {
+            r.status = RevokeStatus::Success;
+          }
+          let config = s.config.clone();
+          return Task::perform(
+            crate::config::writer::save_config_owned(config),
+            Message::RevokeSaved,
+          );
+        }
+        Task::none()
+      }
+
+      Message::RevokeCompleted(Err(e)) => {
+        tracing::warn!("Révocation échouée : {e}");
+        if let AppState::Ready(ref mut s) = self.state {
+          if let Some(ref mut r) = s.revoke {
+            r.status = RevokeStatus::Error(e.to_string());
+          }
+        }
+        Task::none()
+      }
+
+      Message::RevokeSaved(Ok(config)) => {
+        if let AppState::Ready(ref mut s) = self.state {
+          s.config = config;
+          recompute_health(s);
+        }
+        Task::none()
+      }
+
+      Message::RevokeSaved(Err(e)) => {
+        tracing::warn!("Sauvegarde post-révocation échouée : {e}");
         Task::none()
       }
 

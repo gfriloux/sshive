@@ -4,8 +4,8 @@ use iced::widget::{column, container, row, text};
 use iced::{Alignment, Background, Border, Element, Length};
 use uuid::Uuid;
 
-use crate::app::message::{HelpId, Message};
-use crate::app::{AddPassphraseStatus, ReadyState};
+use crate::app::message::{HelpId, Message, Message::StartRevoke};
+use crate::app::{AddPassphraseStatus, ReadyState, RevokeStatus};
 use crate::subprocess::ssh_keygen::ProtectionStatus;
 use crate::ui::help::{maybe_help, section_label};
 use crate::ui::theme::{
@@ -82,6 +82,8 @@ pub fn view_service_detail<'a>(service_id: Uuid, state: &'a ReadyState) -> Eleme
     },
     // Section clef active
     view_key_section(service_id, active_key, &age, service.last_rotation, state),
+    // Section révocation clefs anciennes
+    view_revoke_section(service_id, service.active_key, state),
     // Actions
     view_actions(service_id),
   ]
@@ -346,6 +348,96 @@ fn view_assign_picker<'a>(
   .spacing(6)
   .width(Length::Fill)
   .into()
+}
+
+fn view_revoke_section<'a>(
+  service_id: Uuid,
+  active_key_id: Option<Uuid>,
+  state: &'a ReadyState,
+) -> Element<'a, Message> {
+  // Anciennes clefs : dans config.keys, liées à ce service, mais pas la clef active
+  let old_keys: Vec<&crate::config::model::SshKey> = state
+    .config
+    .keys
+    .iter()
+    .filter(|k| k.service_id == Some(service_id) && Some(k.id) != active_key_id)
+    .collect();
+
+  if old_keys.is_empty() {
+    return iced::widget::Space::new().height(0).into();
+  }
+
+  let rows: Vec<Element<Message>> = old_keys
+    .iter()
+    .map(|key| {
+      let key_id = key.id;
+
+      // Vérifier si une révocation est en cours pour cette clef
+      let revoke_status = state.revoke.as_ref().filter(|r| r.key_id == key_id);
+
+      let action: Element<Message> = match revoke_status {
+        Some(r) => match &r.status {
+          RevokeStatus::Revoking => text("Révocation en cours…")
+            .size(11)
+            .color(TEXT_SECONDARY)
+            .into(),
+          RevokeStatus::Success => text("✓ Révoquée").size(11).color(SUCCESS_GREEN).into(),
+          RevokeStatus::Error(e) => column![
+            text(format!("✕ {e}")).size(11).color(DANGER_RED),
+            iced::widget::button(text("Réessayer").size(11).color(TEXT_SECONDARY))
+              .on_press(Message::StartRevoke { service_id, key_id })
+              .style(|_, _| iced::widget::button::Style {
+                background: None,
+                ..Default::default()
+              }),
+          ]
+          .spacing(2)
+          .into(),
+        },
+        None => iced::widget::button(text("Révoquer").size(11).color(DANGER_RED))
+          .on_press(Message::StartRevoke { service_id, key_id })
+          .style(|_, status| iced::widget::button::Style {
+            background: Some(iced::Background::Color(
+              if matches!(status, iced::widget::button::Status::Hovered) {
+                DANGER_SUBTLE
+              } else {
+                iced::Color::TRANSPARENT
+              },
+            )),
+            border: iced::Border {
+              radius: 4.0.into(),
+              ..Default::default()
+            },
+            ..Default::default()
+          })
+          .padding([2, 8])
+          .into(),
+      };
+
+      container(
+        row![
+          column![
+            fingerprint_text(&key.fingerprint),
+            text(format!("Générée le {}", key.created_at.format("%d %b. %Y")))
+              .size(10)
+              .color(TEXT_DISABLED),
+          ]
+          .spacing(2)
+          .width(Length::Fill),
+          action,
+        ]
+        .align_y(Alignment::Center),
+      )
+      .padding([8, 0])
+      .width(Length::Fill)
+      .into()
+    })
+    .collect();
+
+  container(column![section_label("ANCIENNES CLEFS"), column(rows).spacing(4),].spacing(6))
+    .padding([12, 24])
+    .width(Length::Fill)
+    .into()
 }
 
 fn view_key_security_section<'a>(key_id: Uuid, state: &'a ReadyState) -> Element<'a, Message> {

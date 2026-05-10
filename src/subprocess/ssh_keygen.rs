@@ -193,7 +193,7 @@ pub async fn detect_protection_with(
 /// Inspecte le champ `ciphername` du format OpenSSH binary.
 /// Retourne `Some(true)` si cipher == "none" (pas de passphrase),
 /// `Some(false)` si chiffré, `None` si le format est illisible.
-fn openssh_key_cipher_is_none(path: &std::path::Path) -> Option<bool> {
+pub(crate) fn openssh_key_cipher_is_none(path: &std::path::Path) -> Option<bool> {
   use base64ct::{Base64, Encoding};
 
   let content = std::fs::read_to_string(path).ok()?;

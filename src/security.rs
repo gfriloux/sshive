@@ -13,3 +13,26 @@ pub fn harden_process() {
     }
   }
 }
+
+/// Verrouille `len` octets en RAM à partir de `ptr` (empêche le swap).
+/// No-op sur les plateformes non-unix.
+#[cfg(unix)]
+pub fn mlock_bytes(ptr: *const u8, len: usize) {
+  unsafe {
+    libc::mlock(ptr as *const libc::c_void, len);
+  }
+}
+
+/// Déverrouille `len` octets à partir de `ptr`.
+#[cfg(unix)]
+pub fn munlock_bytes(ptr: *const u8, len: usize) {
+  unsafe {
+    libc::munlock(ptr as *const libc::c_void, len);
+  }
+}
+
+#[cfg(not(unix))]
+pub fn mlock_bytes(_ptr: *const u8, _len: usize) {}
+
+#[cfg(not(unix))]
+pub fn munlock_bytes(_ptr: *const u8, _len: usize) {}

@@ -16,7 +16,8 @@ pub fn view(state: &DeployState) -> Element<'_, Message> {
     DeployStep::ChooseMode => view_choose_mode(),
     DeployStep::AutoDeploying => view_auto_progress(&[]),
     DeployStep::GuidedCommand { command } => view_guided_command(command, state.service_id),
-    DeployStep::Success => view_success(),
+    DeployStep::Verifying => view_verifying(),
+    DeployStep::Success { verified } => view_success(*verified),
     DeployStep::Error(e) => view_error(e),
   }
 }
@@ -273,7 +274,41 @@ fn view_auto_progress(log: &[String]) -> Element<'_, Message> {
   .into()
 }
 
-fn view_success() -> Element<'static, Message> {
+fn view_verifying() -> Element<'static, Message> {
+  container(
+    column![
+      text("Vérification de la connexion…")
+        .font(FONT_SEMIBOLD)
+        .size(16)
+        .color(TEXT_PRIMARY),
+      iced::widget::Space::new().height(8),
+      text("Test de connexion SSH avec la nouvelle clef…")
+        .size(12)
+        .color(TEXT_SECONDARY),
+    ]
+    .align_x(Alignment::Center),
+  )
+  .width(Length::Fill)
+  .height(Length::Fill)
+  .align_x(iced::alignment::Horizontal::Center)
+  .align_y(iced::alignment::Vertical::Center)
+  .padding(24)
+  .into()
+}
+
+fn view_success(verified: bool) -> Element<'static, Message> {
+  let status: Element<Message> = if verified {
+    text("✓ Connexion vérifiée avec succès.")
+      .size(12)
+      .color(SUCCESS_GREEN)
+      .into()
+  } else {
+    text("⚠ Vérification non effectuée — connectez-vous manuellement pour confirmer.")
+      .size(12)
+      .color(crate::ui::theme::WARNING_AMBER)
+      .into()
+  };
+
   container(
     column![
       text("Clef déployée avec succès")
@@ -281,9 +316,7 @@ fn view_success() -> Element<'static, Message> {
         .size(16)
         .color(SUCCESS_GREEN),
       iced::widget::Space::new().height(8),
-      text("Vous pouvez maintenant vous connecter avec votre nouvelle clef SSH.")
-        .size(12)
-        .color(TEXT_SECONDARY),
+      status,
       iced::widget::Space::new().height(24),
       iced::widget::button(text("Fermer").size(13).color(TEXT_PRIMARY))
         .on_press(Message::CloseDeployFlow)

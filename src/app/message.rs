@@ -32,6 +32,7 @@ pub enum Message {
   FormFieldChanged(FormField),
   SubmitServiceForm,
   ServiceSaved(Result<Config, AppError>),
+  TokenSaved(Result<(), AppError>),
   DeleteService(Uuid),
   ServiceDeleted(Result<Config, AppError>),
 
@@ -60,6 +61,7 @@ pub enum Message {
   },
   DeployModeSelected(DeployMode),
   DeployCompleted(Result<(), AppError>),
+  VerifyCompleted(Result<bool, AppError>),
   DeployAndSaved(Result<Config, AppError>),
   GuidedDeployConfirmed,
   CloseDeployFlow,
@@ -75,6 +77,14 @@ pub enum Message {
   AddPassphraseCompleted(Result<(), AppError>),
   KeysProtectionChecked(Vec<(Uuid, crate::subprocess::ssh_keygen::ProtectionStatus)>),
 
+  // ── Révocation de clef ─────────────────────────────────────────
+  StartRevoke {
+    service_id: Uuid,
+    key_id: Uuid,
+  },
+  RevokeCompleted(Result<(), AppError>),
+  RevokeSaved(Result<Config, AppError>),
+
   // ── UI ─────────────────────────────────────────────────────────
   #[allow(dead_code)]
   ToggleHelp(HelpId),
@@ -87,6 +97,7 @@ pub enum NavItem {
   #[default]
   Services,
   SshKeys,
+  Health,
   Settings,
 }
 
@@ -100,6 +111,7 @@ pub enum FormField {
   User(String),
   Port(String),
   DeployMode(DeployMode),
+  Token(String),
 }
 
 /// Blocs d'aide collapse dans l'UI.

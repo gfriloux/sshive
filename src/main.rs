@@ -2,8 +2,11 @@
 
 mod app;
 mod config;
+mod deployer;
 mod error;
+mod health;
 mod regression_v010;
+mod regression_v020;
 mod secrets;
 mod security;
 mod subprocess;

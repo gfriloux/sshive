@@ -132,6 +132,29 @@ fn view_step1(form: &ServiceFormState) -> Element<'_, Message> {
 }
 
 fn view_step2(form: &ServiceFormState) -> Element<'_, Message> {
+  let token_section: Element<Message> = if form.needs_api_token() {
+    let token_ref = crate::app::mod_helpers::sanitize_token_ref_pub(&form.name);
+    column![
+      iced::widget::Space::new().height(12),
+      field_label("Token d'accès personnel *", true),
+      text_input("ghp_… ou glpat_…", &form.token_value)
+        .on_input(|v| Message::FormFieldChanged(FormField::Token(v)))
+        .secure(true)
+        .padding(10)
+        .size(13)
+        .style(text_input_style),
+      iced::widget::Space::new().height(4),
+      text(format!("Référence dans les secrets : {token_ref}"))
+        .size(11)
+        .color(TEXT_SECONDARY),
+    ]
+    .spacing(2)
+    .width(Length::Fill)
+    .into()
+  } else {
+    iced::widget::Space::new().height(0).into()
+  };
+
   if !form.needs_connection_params() {
     // GitHub/GitLab.com : paramètres fixes
     let (host, user) = match &form.service_type {
@@ -139,28 +162,31 @@ fn view_step2(form: &ServiceFormState) -> Element<'_, Message> {
       Some(ServiceType::GitLab) => ("gitlab.com", "git"),
       _ => ("", ""),
     };
-    return container(column![container(
-      column![
-        text("ℹ  Paramètres fixes pour ce service :")
-          .size(12)
-          .color(TEXT_SECONDARY),
-        iced::widget::Space::new().height(8),
-        param_row("Hôte", host),
-        param_row("Utilisateur", user),
-        param_row("Port", "22"),
-      ]
-      .spacing(4),
-    )
-    .padding([12, 14])
-    .width(Length::Fill)
-    .style(|_| container::Style {
-      background: Some(Background::Color(ACCENT_SUBTLE)),
-      border: Border {
-        radius: 6.0.into(),
+    return column![
+      container(
+        column![
+          text("ℹ  Paramètres fixes pour ce service :")
+            .size(12)
+            .color(TEXT_SECONDARY),
+          iced::widget::Space::new().height(8),
+          param_row("Hôte", host),
+          param_row("Utilisateur", user),
+          param_row("Port", "22"),
+        ]
+        .spacing(4),
+      )
+      .padding([12, 14])
+      .width(Length::Fill)
+      .style(|_| container::Style {
+        background: Some(Background::Color(ACCENT_SUBTLE)),
+        border: Border {
+          radius: 6.0.into(),
+          ..Default::default()
+        },
         ..Default::default()
-      },
-      ..Default::default()
-    }),])
+      }),
+      token_section,
+    ]
     .width(Length::Fill)
     .into();
   }
@@ -201,6 +227,7 @@ fn view_step2(form: &ServiceFormState) -> Element<'_, Message> {
       .spacing(2),
     ]
     .align_y(Alignment::End),
+    token_section,
   ]
   .spacing(2)
   .width(Length::Fill)
@@ -231,6 +258,11 @@ fn view_step3(form: &ServiceFormState) -> Element<'_, Message> {
         },
         if !form.user.is_empty() {
           recap_row("Utilisateur", form.user.clone())
+        } else {
+          iced::widget::Space::new().height(0).into()
+        },
+        if form.needs_api_token() && !form.token_value.is_empty() {
+          recap_row("Token", "●●●●●●●●".to_string())
         } else {
           iced::widget::Space::new().height(0).into()
         },

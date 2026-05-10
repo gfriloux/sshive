@@ -12,6 +12,29 @@ pub struct Config {
   pub keys: Vec<SshKey>,
   #[serde(default)]
   pub gpg: GpgConfig,
+  #[serde(default)]
+  pub health: HealthConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthConfig {
+  /// Nombre de jours après la dernière rotation avant d'afficher un avertissement.
+  #[serde(default = "HealthConfig::default_rotation_days")]
+  pub rotation_warning_days: u32,
+}
+
+impl HealthConfig {
+  fn default_rotation_days() -> u32 {
+    90
+  }
+}
+
+impl Default for HealthConfig {
+  fn default() -> Self {
+    Self {
+      rotation_warning_days: Self::default_rotation_days(),
+    }
+  }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -36,6 +59,22 @@ pub struct Service {
   pub last_rotation: Option<NaiveDate>,
   #[serde(default)]
   pub deploy_mode: DeployMode,
+  /// Historique des déploiements (v0.3.0+)
+  #[serde(default)]
+  pub deployments: Vec<Deployment>,
+}
+
+/// Enregistrement d'un déploiement de clef sur un service.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Deployment {
+  pub key_id: Uuid,
+  pub deployed_at: NaiveDate,
+  /// Identifiant retourné par l'API GitHub/GitLab pour la révocation. None pour SSH.
+  #[serde(default)]
+  pub remote_ref: Option<String>,
+  /// Date de la dernière vérification de connexion réussie.
+  #[serde(default)]
+  pub last_verified: Option<NaiveDate>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -159,9 +198,94 @@ keys:
 
   #[test]
   fn config_v010_champs_v020_ignores() {
-    // Un champ futur inconnu ne casse pas la désérialisation
     let yaml = "services: []\nkeys: []\nchamp_futur: valeur";
     assert!(serde_yaml::from_str::<Config>(yaml).is_ok());
+  }
+
+  // ── Migration v0.2.0 → v0.3.0 ────────────────────────────────
+
+  #[test]
+  fn config_v020_sans_deployments_acceptee() {
+    let yaml = r#"
+services:
+  - id: "550e8400-e29b-41d4-a716-446655440000"
+    name: "GitLab"
+    service_type: gitlab
+    active_key: null
+    pending_key: null
+    created_at: "2026-01-01"
+    last_rotation: null
+keys: []
+"#;
+    let config: Config = serde_yaml::from_str(yaml).unwrap();
+    assert!(config.services[0].deployments.is_empty());
+  }
+
+  #[test]
+  fn config_v020_sans_health_config_defaut_90j() {
+    let yaml = "services: []\nkeys: []";
+    let config: Config = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(config.health.rotation_warning_days, 90);
+  }
+
+  #[test]
+  fn health_config_rotation_configurable() {
+    let yaml = "services: []\nkeys: []\nhealth:\n  rotation_warning_days: 30";
+    let config: Config = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(config.health.rotation_warning_days, 30);
+  }
+
+  #[test]
+  fn deployment_round_trip() {
+    let yaml = r#"
+services:
+  - id: "550e8400-e29b-41d4-a716-446655440001"
+    name: "GitHub"
+    service_type: github
+    active_key: null
+    pending_key: null
+    created_at: "2026-01-01"
+    last_rotation: null
+    deployments:
+      - key_id: "660e8400-e29b-41d4-a716-446655440002"
+        deployed_at: "2026-05-10"
+        remote_ref: "12345678"
+        last_verified: "2026-05-10"
+keys: []
+"#;
+    let config: Config = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(config.services[0].deployments.len(), 1);
+    let dep = &config.services[0].deployments[0];
+    assert_eq!(dep.remote_ref.as_deref(), Some("12345678"));
+    assert!(dep.last_verified.is_some());
+
+    let re_yaml = serde_yaml::to_string(&config).unwrap();
+    let config2: Config = serde_yaml::from_str(&re_yaml).unwrap();
+    assert_eq!(
+      config2.services[0].deployments[0].remote_ref,
+      config.services[0].deployments[0].remote_ref
+    );
+  }
+
+  #[test]
+  fn deployment_sans_remote_ref_accepte() {
+    let yaml = r#"
+services:
+  - id: "770e8400-e29b-41d4-a716-446655440003"
+    name: "Prod SSH"
+    service_type: ssh-generic
+    active_key: null
+    pending_key: null
+    created_at: "2026-01-01"
+    last_rotation: null
+    deployments:
+      - key_id: "880e8400-e29b-41d4-a716-446655440004"
+        deployed_at: "2026-05-10"
+keys: []
+"#;
+    let config: Config = serde_yaml::from_str(yaml).unwrap();
+    assert!(config.services[0].deployments[0].remote_ref.is_none());
+    assert!(config.services[0].deployments[0].last_verified.is_none());
   }
 
   // ── Tests v0.1.0 conservés ────────────────────────────────────

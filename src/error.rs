@@ -57,6 +57,20 @@ pub enum AppError {
   #[error("La clef est déjà protégée par une phrase secrète")]
   KeyAlreadyProtected,
 
+  // ── API Forge (GitHub, GitLab) ─────────────────────────────────
+  #[error("API — token invalide pour le service {service}")]
+  ApiUnauthorized { service: String },
+
+  #[error("API — clef déjà présente sur le service {service}")]
+  ApiKeyAlreadyPresent { service: String },
+
+  #[error("API — erreur {status} sur {service} : {message}")]
+  ApiError {
+    service: String,
+    status: u16,
+    message: String,
+  },
+
   // ── Pinentry ───────────────────────────────────────────────────
   #[error("pinentry — opération annulée par l'utilisateur")]
   PinentryUserCancelled,

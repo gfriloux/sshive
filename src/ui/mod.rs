@@ -1,6 +1,7 @@
 pub mod deploy_flow;
 pub mod detail_panel;
 pub mod gpg_setup;
+pub mod health_view;
 pub mod help;
 pub mod key_gen_flow;
 pub mod key_list;
@@ -103,6 +104,7 @@ pub fn view_ready(state: &ReadyState) -> Element<'_, Message> {
       &state.key_protection,
       state.selected_key,
     ),
+    NavItem::Health => health_view::view_health(state),
     NavItem::Settings => container(text("Paramètres — à venir").size(13).color(TEXT_SECONDARY))
       .width(Length::Fill)
       .height(Length::Fill)

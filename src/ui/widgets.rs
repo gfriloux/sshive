@@ -148,6 +148,7 @@ mod tests {
       created_at: NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
       last_rotation: None,
       deploy_mode: DeployMode::Automatic,
+      deployments: vec![],
     }
   }
 

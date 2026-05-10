@@ -9,35 +9,50 @@ use zeroize::Zeroize;
 
 use crate::error::AppError;
 
-// ── Passphrase — buffer zéroïsé au drop ───────────────────────────────────
+// ── Passphrase — buffer fixe, zéroïsé + mlock au drop ────────────────────
 
-pub struct Passphrase(Vec<u8>);
+const PASSPHRASE_BUF_SIZE: usize = 256;
+
+/// Buffer de passphrase à capacité fixe.
+/// - Pas de réallocation → pas de copies de secrets dans le heap
+/// - mlock : la page contenant le buffer ne sera pas swappée
+/// - zeroize au Drop
+pub struct Passphrase {
+  buf: Box<[u8; PASSPHRASE_BUF_SIZE]>,
+  len: usize,
+}
 
 impl Passphrase {
   pub fn new(s: String) -> Self {
-    Self(s.into_bytes())
+    let bytes = s.into_bytes();
+    let len = bytes.len().min(PASSPHRASE_BUF_SIZE);
+    let mut buf = Box::new([0u8; PASSPHRASE_BUF_SIZE]);
+    buf[..len].copy_from_slice(&bytes[..len]);
+    crate::security::mlock_bytes(buf.as_ptr(), PASSPHRASE_BUF_SIZE);
+    Self { buf, len }
   }
 
   pub fn as_bytes(&self) -> &[u8] {
-    &self.0
+    &self.buf[..self.len]
   }
 
   pub fn as_str(&self) -> &str {
-    std::str::from_utf8(&self.0).unwrap_or("")
+    std::str::from_utf8(self.as_bytes()).unwrap_or("")
   }
 
   pub fn is_empty(&self) -> bool {
-    self.0.is_empty()
+    self.len == 0
   }
 
   pub fn len(&self) -> usize {
-    self.0.len()
+    self.len
   }
 }
 
 impl Drop for Passphrase {
   fn drop(&mut self) {
-    self.0.zeroize();
+    self.buf.zeroize();
+    crate::security::munlock_bytes(self.buf.as_ptr(), PASSPHRASE_BUF_SIZE);
   }
 }
 

@@ -31,6 +31,7 @@ pub fn view_sidebar(active: NavItem) -> Element<'static, Message> {
   let nav = column![
     nav_item("Services", NavItem::Services, active),
     nav_item("SSH Keys", NavItem::SshKeys, active),
+    nav_item("Health", NavItem::Health, active),
   ]
   .spacing(2)
   .padding(Padding {

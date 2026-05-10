@@ -1,6 +1,7 @@
 pub mod gpg;
 pub mod pinentry;
 pub mod ssh_copy_id;
+pub mod ssh_key_reencrypt;
 pub mod ssh_keygen;
 
 use async_trait::async_trait;
