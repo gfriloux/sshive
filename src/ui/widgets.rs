@@ -2,6 +2,8 @@ use chrono::NaiveDate;
 use iced::widget::{container, text};
 use iced::{Background, Border, Element};
 
+use uuid::Uuid;
+
 use crate::app::message::Message;
 use crate::config::model::{Service, ServiceType};
 use crate::ui::theme::{
@@ -54,10 +56,10 @@ pub fn age_indicator(last_rotation: Option<NaiveDate>) -> AgeIndicator {
   }
 }
 
-pub fn count_services_using_key(fp: &str, services: &[Service]) -> usize {
+pub fn count_services_using_key(key_id: Uuid, services: &[Service]) -> usize {
   services
     .iter()
-    .filter(|s| s.active_key.as_deref() == Some(fp))
+    .filter(|s| s.active_key == Some(key_id))
     .count()
 }
 
@@ -133,17 +135,19 @@ pub fn fingerprint_text(fp: &str) -> Element<'static, Message> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::config::model::{KeyType, ServiceParams, ServiceType};
+  use crate::config::model::{DeployMode, KeyType, ServiceParams, ServiceType};
 
-  fn make_service(name: &str, fp: &str) -> Service {
+  fn make_service(name: &str, key_id: Option<Uuid>) -> Service {
     Service {
+      id: Uuid::new_v4(),
       name: name.to_string(),
       service_type: ServiceType::Manual,
       params: ServiceParams::default(),
-      active_key: Some(fp.to_string()),
+      active_key: key_id,
       pending_key: None,
       created_at: NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(),
       last_rotation: None,
+      deploy_mode: DeployMode::Automatic,
     }
   }
 
@@ -189,14 +193,15 @@ mod tests {
 
   #[test]
   fn shared_key_count_exact() {
-    let fp = "SHA256:shared";
+    let shared_id = Uuid::new_v4();
+    let other_id = Uuid::new_v4();
     let services = vec![
-      make_service("A", fp),
-      make_service("B", fp),
-      make_service("C", "SHA256:autre"),
+      make_service("A", Some(shared_id)),
+      make_service("B", Some(shared_id)),
+      make_service("C", Some(other_id)),
     ];
-    assert_eq!(count_services_using_key(fp, &services), 2);
-    assert_eq!(count_services_using_key("SHA256:autre", &services), 1);
-    assert_eq!(count_services_using_key("SHA256:nope", &services), 0);
+    assert_eq!(count_services_using_key(shared_id, &services), 2);
+    assert_eq!(count_services_using_key(other_id, &services), 1);
+    assert_eq!(count_services_using_key(Uuid::new_v4(), &services), 0);
   }
 }

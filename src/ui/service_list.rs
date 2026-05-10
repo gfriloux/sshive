@@ -15,6 +15,7 @@ use crate::ui::widgets::{
 pub fn view_service_list<'a>(
   services: &'a [Service],
   all_keys: &'a [SshKey],
+  selected_id: Option<uuid::Uuid>,
 ) -> Element<'a, Message> {
   let header = view_header(services.len());
   let table_header = view_table_header();
@@ -25,7 +26,7 @@ pub fn view_service_list<'a>(
     scrollable(column(
       services
         .iter()
-        .map(|s| view_service_row(s, services, all_keys))
+        .map(|s| view_service_row(s, services, all_keys, selected_id))
         .collect::<Vec<_>>(),
     ))
     .into()
@@ -51,6 +52,22 @@ fn view_header(count: usize) -> Element<'static, Message> {
       ))
       .size(13)
       .color(TEXT_SECONDARY),
+      iced::widget::Space::new().width(12),
+      iced::widget::button(
+        text("+ Ajouter")
+          .size(12)
+          .color(crate::ui::theme::TEXT_PRIMARY),
+      )
+      .on_press(Message::OpenCreateService)
+      .style(|_, _| iced::widget::button::Style {
+        background: Some(Background::Color(crate::ui::theme::ACCENT_PRIMARY)),
+        border: Border {
+          radius: 6.0.into(),
+          ..Default::default()
+        },
+        ..Default::default()
+      })
+      .padding([6, 12]),
     ]
     .align_y(Alignment::Center),
   )
@@ -122,7 +139,9 @@ fn view_service_row<'a>(
   service: &'a Service,
   all_services: &'a [Service],
   all_keys: &'a [SshKey],
+  selected_id: Option<uuid::Uuid>,
 ) -> Element<'a, Message> {
+  let is_selected = selected_id == Some(service.id);
   let age = age_indicator(service.last_rotation);
   let age_color = if age.is_warning {
     WARNING_AMBER
@@ -130,21 +149,22 @@ fn view_service_row<'a>(
     TEXT_SECONDARY
   };
 
-  let fp_display: Element<Message> = match &service.active_key {
-    Some(fp) => fingerprint_text(fp),
+  // Résoudre la clef active par UUID
+  let active_key = service
+    .active_key
+    .and_then(|id| all_keys.iter().find(|k| k.id == id));
+
+  let fp_display: Element<Message> = match active_key {
+    Some(key) => fingerprint_text(&key.fingerprint),
     None => text("—").size(11).color(TEXT_DISABLED).into(),
   };
 
   let shared_count = service
     .active_key
-    .as_deref()
-    .map(|fp| count_services_using_key(fp, all_services))
+    .map(|id| count_services_using_key(id, all_services))
     .unwrap_or(0);
 
-  let has_yubikey = service
-    .active_key
-    .as_deref()
-    .is_some_and(|fp| all_keys.iter().any(|k| k.fingerprint == fp && k.yubikey));
+  let has_yubikey = active_key.is_some_and(|k| k.yubikey);
 
   let yk: Element<Message> = if has_yubikey {
     yubikey_badge()
@@ -162,25 +182,37 @@ fn view_service_row<'a>(
   };
   let badges = row![yk, shared].align_y(Alignment::Center);
 
-  container(
-    row![
-      text(&service.name)
-        .size(13)
-        .color(TEXT_PRIMARY)
-        .width(Length::FillPortion(3)),
-      container(service_type_badge(&service.service_type)).width(Length::Fixed(90.0)),
-      container(fp_display).width(Length::FillPortion(4)),
-      text(age.label)
-        .size(12)
-        .color(age_color)
-        .width(Length::Fixed(120.0)),
-      container(badges).width(Length::Fixed(80.0)),
-    ]
-    .align_y(Alignment::Center),
+  let service_id = service.id;
+
+  iced::widget::button(
+    container(
+      row![
+        text(&service.name)
+          .size(13)
+          .color(TEXT_PRIMARY)
+          .width(Length::FillPortion(3)),
+        container(service_type_badge(&service.service_type)).width(Length::Fixed(90.0)),
+        container(fp_display).width(Length::FillPortion(4)),
+        text(age.label)
+          .size(12)
+          .color(age_color)
+          .width(Length::Fixed(120.0)),
+        container(badges).width(Length::Fixed(80.0)),
+      ]
+      .align_y(Alignment::Center),
+    )
+    .padding([12, 24])
+    .width(Length::Fill),
   )
-  .padding([12, 24])
-  .width(Length::Fill)
-  .style(|_| container::Style {
+  .on_press(Message::SelectService(Some(service_id)))
+  .style(move |_, status| iced::widget::button::Style {
+    background: Some(Background::Color(if is_selected {
+      crate::ui::theme::ACCENT_SUBTLE
+    } else if matches!(status, iced::widget::button::Status::Hovered) {
+      crate::ui::theme::BACKGROUND_CARD
+    } else {
+      crate::ui::theme::BACKGROUND_BASE
+    })),
     border: Border {
       color: BORDER_SUBTLE,
       width: 1.0,
@@ -188,6 +220,7 @@ fn view_service_row<'a>(
     },
     ..Default::default()
   })
+  .width(Length::Fill)
   .into()
 }
 

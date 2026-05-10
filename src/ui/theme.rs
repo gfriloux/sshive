@@ -97,6 +97,13 @@ pub const ACCENT_PRIMARY: Color = Color {
   a: 1.0,
 }; // #3B82F6
 
+pub const ACCENT_HOVER: Color = Color {
+  r: 0.145,
+  g: 0.400,
+  b: 0.922,
+  a: 1.0,
+}; // #2563EB
+
 pub const ACCENT_SUBTLE: Color = Color {
   r: 0.118,
   g: 0.227,
