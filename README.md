@@ -10,13 +10,26 @@ SSHive makes the right behaviour as simple as the wrong one.
 
 ## Status
 
-**v0.1.0** — read-only. Loads your existing SSH config and keys, displays
-them with rotation age indicators and shared-key warnings. No writes, no
-network connections.
+**v0.2.0** — write mode. Create and manage services, generate SSH keys
+(ed25519 and sk-ed25519/YubiKey), deploy them via `ssh-copy-id`, and encrypt
+secrets with your GPG key.
+
+## Features
+
+- **Service management** — create, edit, delete services; stored in `~/.config/sshive/config.yaml`
+- **SSH key generation** — ed25519 and sk-ed25519 (YubiKey/FIDO2); passphrase collected via pinentry
+- **Key deployment** — automatic (`ssh-copy-id`) or guided (copy-paste command)
+- **Key assignment** — attach any existing `~/.ssh/*.pub` to a service
+- **Unprotected key detection** — warns when a private key has no passphrase and offers to add one
+- **GPG-encrypted secrets** — API tokens and secrets encrypted with your own GPG key
+- **3-column layout** — sidebar, list, detail/wizard panel with rotation age and fingerprint display
 
 ## Requirements
 
 - Linux (x86_64 or aarch64)
+- `gpg` and a GPG key (required at first launch)
+- `pinentry-gtk-2`, `pinentry-gnome3`, or `pinentry-qt` (for passphrase dialogs)
+- `ssh-keygen` and `ssh-copy-id` (for key generation and deployment)
 - Nix with flakes enabled (recommended) — or a Rust toolchain with the system
   libraries listed below
 
@@ -36,35 +49,25 @@ The binary is at `target/release/sshive`.
 ## Configuration
 
 SSHive reads `~/.config/sshive/config.yaml`. The file is created empty on
-first launch. The expected format:
-
-```yaml
-services:
-  - name: "GitHub perso"
-    service_type: github   # github | gitlab | gitlab-self-hosted | ssh-generic | manual
-    active_key: "SHA256:…"
-    created_at: "2025-01-15"
-    last_rotation: null
-
-keys:
-  - fingerprint: "SHA256:…"
-    key_type: ed25519      # ed25519 | sk-ed25519
-    yubikey: false
-    created_at: "2025-01-15"
-    comment: "sshive/github_perso/2025-01-15"
-```
+first launch. Services and keys can be managed entirely from the UI.
 
 The file must have permissions `0600`. SSHive warns on startup if it is
 world-readable.
 
 ## Privacy
 
-SSHive processes data **exclusively on your local machine**.
+SSHive makes **outgoing connections only**, initiated explicitly by you
+(key deployment to your own servers). See [PRIVACY.md](PRIVACY.md) for details.
 
-- No telemetry
-- No network connections (v0.1.x)
-- No data leaves the filesystem
-- Config and keys stay in `~/.config/sshive/`
+- No telemetry, no update checks, no analytics
+- Outgoing SSH connections only (to servers you configure)
+- Config: `~/.config/sshive/config.yaml` (permissions 0600)
+- Secrets: `~/.config/sshive/secrets.yaml.gpg` (GPG-encrypted)
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the vulnerability reporting policy and
+known advisories.
 
 ## License
 
