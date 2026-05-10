@@ -292,12 +292,15 @@ impl App {
           );
         }
         // Sinon → charger les secrets puis scanner les clefs
-        let fp = config.gpg.key_fingerprint.clone().unwrap();
-        let secrets_path = config
+        // key_fingerprint est Some : vérifié par le is_none() ci-dessus
+        let fp = config
           .gpg
-          .secrets_path
+          .key_fingerprint
           .clone()
-          .unwrap_or_else(|| crate::secrets::secrets_path_default().unwrap());
+          .expect("key_fingerprint présent — vérifié par is_none()");
+        let secrets_path = config.gpg.secrets_path.clone().unwrap_or_else(|| {
+          crate::secrets::secrets_path_default().expect("répertoire config accessible")
+        });
 
         self.state = AppState::Ready(ReadyState {
           config,
