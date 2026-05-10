@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SSHive
+GenericName=SSH Key Manager
+Comment=Manage your SSH keys — one key per service
+Exec=sshive
+Icon=sshive
+Categories=Utility;Security;
+Keywords=ssh;keys;security;yubikey;rotation;
+StartupNotify=true

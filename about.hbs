@@ -1,0 +1,17 @@
+SSHive Third-Party Licenses
+============================
+
+This file lists the open-source licenses of all crates bundled in SSHive.
+
+{{#each licenses}}
+{{#if first_of_kind}}
+--------------------------------------------------------------------------------
+{{name}} ({{id}})
+--------------------------------------------------------------------------------
+
+{{{text}}}
+
+Used by:
+{{/if}}
+  - {{crate.name}} {{crate.version}}
+{{/each}}

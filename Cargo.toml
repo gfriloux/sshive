@@ -1,0 +1,29 @@
+[package]
+name    = "sshive"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+iced              = { version = "0.14", features = ["tokio"] }
+tokio             = { version = "1", features = ["fs", "rt-multi-thread"] }
+serde             = { version = "1.0",  features = ["derive"] }
+serde_yaml        = "0.9"
+ssh-key           = "0.6.7"
+dirs              = "6.0"
+glob              = "0.3"
+chrono            = { version = "0.4", default-features = false, features = ["serde", "clock"] }
+thiserror         = "2.0"
+tracing           = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio    = { version = "1", features = ["rt", "macros"] }
+
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1
+strip         = "symbols"

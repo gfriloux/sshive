@@ -1,0 +1,28 @@
+[advisories]
+ignore = [
+  # RUSTSEC-2023-0071 — Marvin Attack sur rsa 0.9.x via ssh-key.
+  # SSHive ignore silencieusement les clefs RSA (seuls ed25519/sk-ed25519
+  # sont acceptés dans parse_pub_key_file). Surface d'attaque nulle.
+  # Aucun correctif disponible upstream ; à surveiller lors des mises à
+  # jour de ssh-key.
+  "RUSTSEC-2023-0071",
+
+  # RUSTSEC-2024-0436 — paste unmaintained via metal → wgpu-hal → iced.
+  # Transitif, hors de notre contrôle. À suivre lors des updates d'iced.
+  "RUSTSEC-2024-0436",
+]
+
+[licenses]
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+]
+
+[bans]
+multiple-versions = "warn"
