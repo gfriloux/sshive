@@ -6,6 +6,40 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-10
+
+### Added
+
+- **Pure-Rust SSH key re-encryption** — `ssh-key` crate (bcrypt-pbkdf + AES-256-CTR) replaces `ssh-keygen -N`; passphrase never appears in process arguments or `/proc/<pid>/cmdline`
+- **GitHub API connector** — deploy, revoke, and verify ed25519 keys via `POST/DELETE/GET /user/keys`; duplicate detection returns `ApiKeyAlreadyPresent` instead of erroring
+- **GitLab.com and self-hosted API connector** — same operations via `/api/v4/user/keys` with `Private-Token` header; self-hosted base URL configurable
+- **Post-deploy verification** — after automatic deployment the deployer re-connects via SSH to confirm the key is accepted; result shown in deploy success screen
+- **Key revocation UI** — detail panel lists all previous keys for a service with a Revoke button; calls the appropriate API or SSH revocation path
+- **Health/Diagnostic view** — full-page table showing key age, protection status, pending deployment, and rotation overdue warnings; accessible from sidebar
+- **`HealthSnapshot`** — pure computation from config + keys + protection, recomputed on every relevant event (no per-frame computation)
+- **`ApiToken(SecretString)`** — wraps sensitive tokens; `Debug` prints `ApiToken(***)` only; backed by `secrecy` crate
+- **`mlock` on `Passphrase`** — private 256-byte pinned buffer; locked with `libc::mlock`, zeroed on `Drop`
+- **`HttpClient` trait** — injectable for tests; `ReqwestHttpClient` (rustls + webpki roots, no native TLS); `FakeHttpClient` for unit tests
+- **Regression suite** — `regression_v020.rs` with 8 migration-safety tests covering config round-trip, key UUID stability, and health computation
+- **`docs/CRYPTO.md`** — cryptographic policy (algorithms, key lengths, cipher modes, RNG, mlock)
+- **`docs/THREAT_MODEL.md`** — 6 threat scenarios T1–T6 with mitigations and accepted residual risks
+
+### Changed
+
+- `DeployStep::Success` now carries `verified: bool`; UI distinguishes "✓ Connexion vérifiée" from "⚠ Vérification non effectuée"
+- Sidebar gains a Health navigation item
+- Service config model gains `deployments: Vec<Deployment>` (tracks deployed keys with date and remote ref) and `Config.health` (`rotation_warning_days`, default 90)
+
+### Security
+
+- Passphrase never passed via `-N` to `ssh-keygen` — pure Rust re-encryption via `ssh-key` crate closes the v0.2.0 known limitation
+- All HTTP connections use rustls + WebPKI roots; no native TLS, no OpenSSL, no system certificate store
+- API tokens stored in `secrets.yaml.gpg` and exposed only through `ApiToken::expose()` at call sites; never logged
+
+### Fixed
+
+- GitLab 400 response body is a nested object (`{"message": {"fingerprint": [...]}}`), not a plain string; now correctly detected as `ApiKeyAlreadyPresent` without unwrap panic
+
 ## [0.2.0] - 2026-05-10
 
 ### Added

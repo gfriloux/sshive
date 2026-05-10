@@ -4,8 +4,9 @@
 
 | Version | Supported |
 |---------|-----------|
+| 0.3.x   | ✅        |
 | 0.2.x   | ✅        |
-| 0.1.x   | ✅        |
+| 0.1.x   | ❌        |
 
 ## Reporting a Vulnerability
 
@@ -23,9 +24,13 @@ This project is maintained by one person in their spare time. There is no guaran
 ## Scope
 
 SSHive processes SSH public keys and configuration files stored locally on
-your machine. In v0.2.x it makes **outgoing SSH connections only**, initiated
-explicitly by the user (key deployment, verification). It transmits no data
-to third parties.
+your machine. In v0.3.x it makes **outgoing connections only**, initiated
+explicitly by the user:
+
+- SSH connections to servers you configure (deployment, verification, revocation)
+- HTTPS connections to GitHub API (`api.github.com`) and GitLab API (`gitlab.com` or your self-hosted instance) for services of those types — only when you trigger a deploy/revoke/verify action
+
+It transmits no data to third parties for telemetry or analytics.
 
 ## Known Advisories
 

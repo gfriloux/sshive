@@ -14,21 +14,29 @@ SSHive stores the following data on your machine only:
 
 SSHive makes **outgoing connections only**, initiated explicitly by you:
 
-| Operation | Destination | Protocol |
-|-----------|-------------|----------|
-| Deploy key (automatic) | Your configured server | SSH (port 22 or custom) |
-| Verify connection | Your configured server | SSH |
-| Revoke key | Your configured server | SSH |
+| Operation | Destination | Protocol | Condition |
+|-----------|-------------|----------|-----------|
+| Deploy key (automatic) | Your configured server | SSH (port 22 or custom) | SSH generic / Manual services |
+| Verify connection | Your configured server | SSH | After automatic deployment |
+| Revoke key | Your configured server | SSH | SSH generic / Manual services |
+| Deploy key | `api.github.com` | HTTPS (443) | GitHub services only |
+| Revoke key | `api.github.com` | HTTPS (443) | GitHub services only |
+| Verify key | `api.github.com` | HTTPS (443) | GitHub services only |
+| Deploy key | `gitlab.com` or your self-hosted URL | HTTPS (443) | GitLab services only |
+| Revoke key | `gitlab.com` or your self-hosted URL | HTTPS (443) | GitLab services only |
+| Verify key | `gitlab.com` or your self-hosted URL | HTTPS (443) | GitLab services only |
 
-SSHive never connects to Anthropic servers, analytics services, or any third party. There is no telemetry, no crash reporting, and no update check.
+All HTTPS connections use rustls with WebPKI certificate roots (no system certificate store, no native TLS).
+
+SSHive never connects to Anthropic servers, analytics services, or any other third party. There is no telemetry, no crash reporting, and no update check.
 
 ## External processes
 
 SSHive invokes the following local programs as subprocesses:
 
-- `ssh-keygen` — key generation and passphrase management
-- `ssh-copy-id` — automatic key deployment
-- `ssh` — connection verification and key revocation
+- `ssh-keygen` — key generation (passphrase re-encryption is done in-process via the `ssh-key` crate; no passphrase is passed as a command-line argument)
+- `ssh-copy-id` — automatic key deployment (SSH generic / Manual services)
+- `ssh` — connection verification and key revocation (SSH generic / Manual services)
 - `gpg` — secret encryption/decryption and key management
 - `pinentry-*` — passphrase collection (runs in a separate window)
 

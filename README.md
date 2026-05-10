@@ -10,18 +10,22 @@ SSHive makes the right behaviour as simple as the wrong one.
 
 ## Status
 
-**v0.2.0** — write mode. Create and manage services, generate SSH keys
-(ed25519 and sk-ed25519/YubiKey), deploy them via `ssh-copy-id`, and encrypt
-secrets with your GPG key.
+**v0.3.0** — security & connectors. Pure-Rust SSH key re-encryption (no
+passphrase in process arguments), GitHub and GitLab API connectors, post-deploy
+verification, key revocation, and a Health/Diagnostic view.
 
 ## Features
 
 - **Service management** — create, edit, delete services; stored in `~/.config/sshive/config.yaml`
-- **SSH key generation** — ed25519 and sk-ed25519 (YubiKey/FIDO2); passphrase collected via pinentry
-- **Key deployment** — automatic (`ssh-copy-id`) or guided (copy-paste command)
+- **SSH key generation** — ed25519 and sk-ed25519 (YubiKey/FIDO2); passphrase collected via pinentry; re-encryption done entirely in-process (no subprocess, no passphrase in argv)
+- **Key deployment** — automatic (`ssh-copy-id` or GitHub/GitLab API) or guided (copy-paste command)
+- **GitHub & GitLab connectors** — deploy, revoke, and verify keys via API; supports GitLab self-hosted
+- **Post-deploy verification** — confirms the deployed key is accepted by SSH/API after deployment
+- **Key revocation** — remove old keys from servers or APIs directly from the detail panel
 - **Key assignment** — attach any existing `~/.ssh/*.pub` to a service
 - **Unprotected key detection** — warns when a private key has no passphrase and offers to add one
-- **GPG-encrypted secrets** — API tokens and secrets encrypted with your own GPG key
+- **GPG-encrypted secrets** — API tokens encrypted with your own GPG key; never logged or printed
+- **Health/Diagnostic view** — rotation age, protection status, pending deployment, per-service health level
 - **3-column layout** — sidebar, list, detail/wizard panel with rotation age and fingerprint display
 
 ## Requirements
@@ -56,11 +60,12 @@ world-readable.
 
 ## Privacy
 
-SSHive makes **outgoing connections only**, initiated explicitly by you
-(key deployment to your own servers). See [PRIVACY.md](PRIVACY.md) for details.
+SSHive makes **outgoing connections only**, initiated explicitly by you.
+See [PRIVACY.md](PRIVACY.md) for details.
 
 - No telemetry, no update checks, no analytics
-- Outgoing SSH connections only (to servers you configure)
+- SSH connections to your own servers (deployment, verification, revocation)
+- HTTPS to GitHub/GitLab APIs only when you trigger an action on those service types (rustls, no native TLS)
 - Config: `~/.config/sshive/config.yaml` (permissions 0600)
 - Secrets: `~/.config/sshive/secrets.yaml.gpg` (GPG-encrypted)
 
