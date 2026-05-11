@@ -8,25 +8,24 @@ compromise becomes total; rotation is nearly impossible to do cleanly.
 
 SSHive makes the right behaviour as simple as the wrong one.
 
-## Status
-
-**v0.3.0** — security & connectors. Pure-Rust SSH key re-encryption (no
-passphrase in process arguments), GitHub and GitLab API connectors, post-deploy
-verification, key revocation, and a Health/Diagnostic view.
-
 ## Features
 
-- **Service management** — create, edit, delete services; stored in `~/.config/sshive/config.yaml`
-- **SSH key generation** — ed25519 and sk-ed25519 (YubiKey/FIDO2); passphrase collected via pinentry; re-encryption done entirely in-process (no subprocess, no passphrase in argv)
-- **Key deployment** — automatic (`ssh-copy-id` or GitHub/GitLab API) or guided (copy-paste command)
-- **GitHub & GitLab connectors** — deploy, revoke, and verify keys via API; supports GitLab self-hosted
-- **Post-deploy verification** — confirms the deployed key is accepted by SSH/API after deployment
+- **Service management** — create, edit, delete services; stored in `~/.config/sshive/config.yaml`; Cancel button on all form steps with dirty-state confirmation
+- **SSH key generation** — ed25519 and sk-ed25519 (YubiKey/FIDO2); passphrase collected via pinentry; re-encryption done entirely in-process via the `ssh-key` crate (no subprocess, no passphrase in process arguments)
+- **Key deployment** — automatic (`ssh-copy-id` or GitHub/GitLab API) or guided (copy-paste command); pre-flight token format + authorization check before any key is generated
+- **ExternalCm mode** — for services whose `authorized_keys` are managed by NixOS, Ansible, Puppet, or similar: displays the public key to copy with step-by-step instructions, skips `ssh-copy-id` and post-deploy verification; configurable per service
+- **GitHub & GitLab connectors** — deploy, revoke, and verify keys via REST API; supports GitLab self-hosted; in-app token creation guide with clickable URL (`xdg-open`) and scope recommendation (`admin:public_key` / `api`)
+- **Post-deploy verification** — confirms the deployed key is accepted by SSH/API after deployment; mandatory and non-bypassable for sk-ed25519/YubiKey keys
+- **SK (YubiKey) rotation safety** — pre-rotation warning screen; mandatory verify-before-revoke; backup prompt for key handle files (`HealthReason::HardwareKeyHandleNotBackedUp`)
 - **Key revocation** — remove old keys from servers or APIs directly from the detail panel
-- **Key assignment** — attach any existing `~/.ssh/*.pub` to a service
-- **Unprotected key detection** — warns when a private key has no passphrase and offers to add one
-- **GPG-encrypted secrets** — API tokens encrypted with your own GPG key; never logged or printed
-- **Health/Diagnostic view** — rotation age, protection status, pending deployment, per-service health level
-- **3-column layout** — sidebar, list, detail/wizard panel with rotation age and fingerprint display
+- **Key assignment** — attach any existing `~/.ssh/*.pub` to a service; scrollable picker (240px cap) with text filter for large key collections
+- **Copy public key** — "Copier la clef publique" button in key detail and service detail panels; clipboard feedback "✓ Copié" for 2 seconds
+- **Unprotected key detection** — warns when a private key has no passphrase and offers to add one via pinentry
+- **GPG-encrypted secrets** — API tokens encrypted with your own GPG key; never logged or printed; `ApiToken` type Debug-obfuscated
+- **Health/Diagnostic view** — rotation age, protection status, pending deployment, missing API token, YubiKey backup status; per-service health levels (Critical / Warning / Info / OK)
+- **Deploy mode indicator** — service detail panel shows the deploy mode (Automatique / Guidé / Géré externalement) in the CONNEXION section
+- **Local audit log** — append-only `~/.config/sshive/audit.log` (0600) for key generation, revocation, and service deletion
+- **3-column layout** — sidebar, list, fully scrollable detail/wizard panel with rotation age and fingerprint display
 
 ## Requirements
 
