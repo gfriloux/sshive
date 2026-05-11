@@ -53,18 +53,43 @@ pub struct ReadyState {
   pub form: Option<ServiceFormState>,
   pub key_gen: Option<KeyGenState>,
   pub deploy: Option<DeployState>,
+  pub deploy_blocker: Option<DeployBlocker>,
   pub key_protection: HashMap<Uuid, ProtectionStatus>,
   pub add_passphrase: Option<AddPassphraseState>,
   pub revoke: Option<RevokeState>,
   pub health: HealthSnapshot,
+  pub key_filter: String,
+  pub copy_feedback: Option<(Uuid, std::time::Instant)>,
+}
+
+/// Raison de blocage avant déploiement.
+#[derive(Debug, Clone)]
+pub enum DeployBlocker {
+  MissingToken {
+    service_name: String,
+  },
+  InvalidTokenFormat {
+    service_name: String,
+    reason: String,
+  },
+  TokenProbeUnauthorized {
+    service_name: String,
+  },
+  TokenProbeError {
+    service_name: String,
+    message: String,
+  },
 }
 
 /// Étapes du flux de déploiement.
 #[derive(Debug, Clone)]
 pub enum DeployStep {
+  SkPreFlight,
+  Preflight,
   ChooseMode,
   AutoDeploying,
   GuidedCommand { command: String },
+  ExternalCmDeploy { public_key: String },
   Verifying,
   Success { verified: bool },
   Error(String),
@@ -155,6 +180,7 @@ pub struct ServiceFormState {
   pub token_value: String,
   pub editing_id: Option<Uuid>,
   pub error: Option<String>,
+  pub confirm_cancel: bool,
 }
 
 impl ServiceFormState {
@@ -180,9 +206,10 @@ impl ServiceFormState {
         .map(|p| p.to_string())
         .unwrap_or_else(|| "22".to_string()),
       deploy_mode: service.deploy_mode.clone(),
-      token_value: String::new(), // token non réaffiché par sécurité
+      token_value: String::new(),
       editing_id: Some(service.id),
       error: None,
+      confirm_cancel: false,
     }
   }
 
@@ -203,12 +230,18 @@ impl ServiceFormState {
     !self.name.trim().is_empty() && self.service_type.is_some()
   }
 
+  pub fn is_dirty(&self) -> bool {
+    if self.editing_id.is_some() {
+      true
+    } else {
+      !self.name.is_empty() || self.service_type.is_some()
+    }
+  }
+
   pub fn needs_connection_params(&self) -> bool {
     matches!(
       self.service_type,
-      Some(ServiceType::SshGeneric)
-        | Some(ServiceType::GitLabSelfHosted)
-        | Some(ServiceType::Manual)
+      Some(ServiceType::SshGeneric) | Some(ServiceType::GitLabSelfHosted)
     )
   }
 
@@ -282,7 +315,12 @@ fn sanitize_token_ref(name: &str) -> String {
 fn recompute_health(s: &mut ReadyState) {
   let all_keys: Vec<&SshKey> = s.config.keys.iter().chain(s.local_keys.iter()).collect();
   let all_keys_owned: Vec<SshKey> = all_keys.into_iter().cloned().collect();
-  s.health = HealthSnapshot::compute(&s.config, &all_keys_owned, &s.key_protection);
+  s.health = HealthSnapshot::compute(
+    &s.config,
+    &all_keys_owned,
+    &s.key_protection,
+    Some(&s.secrets),
+  );
 }
 
 /// Infère le chemin de la clef privée depuis une SshKey.
@@ -566,6 +604,35 @@ impl App {
         Task::none()
       }
 
+      Message::CancelFormRequested => {
+        if let AppState::Ready(ref mut s) = self.state {
+          if let Some(ref mut form) = s.form {
+            if form.is_dirty() {
+              form.confirm_cancel = true;
+            } else {
+              s.form = None;
+            }
+          }
+        }
+        Task::none()
+      }
+
+      Message::CancelFormConfirmed => {
+        if let AppState::Ready(ref mut s) = self.state {
+          s.form = None;
+        }
+        Task::none()
+      }
+
+      Message::CancelFormAborted => {
+        if let AppState::Ready(ref mut s) = self.state {
+          if let Some(ref mut form) = s.form {
+            form.confirm_cancel = false;
+          }
+        }
+        Task::none()
+      }
+
       Message::FormStepNext => {
         if let AppState::Ready(ref mut s) = self.state {
           if let Some(ref mut form) = s.form {
@@ -588,6 +655,78 @@ impl App {
               form.step -= 1;
             }
           }
+        }
+        Task::none()
+      }
+
+      Message::DismissBackupPrompt(key_id) => {
+        if let AppState::Ready(ref s) = self.state {
+          let mut config = s.config.clone();
+          if let Some(k) = config.keys.iter_mut().find(|k| k.id == key_id) {
+            k.backup_prompted = true;
+          }
+          return Task::perform(
+            crate::config::writer::save_config_owned(config),
+            Message::BackupPromptSaved,
+          );
+        }
+        Task::none()
+      }
+
+      Message::BackupPromptSaved(Ok(config)) => {
+        if let AppState::Ready(ref mut s) = self.state {
+          s.config = config;
+        }
+        Task::none()
+      }
+
+      Message::BackupPromptSaved(Err(e)) => {
+        tracing::warn!("Sauvegarde backup_prompted échouée : {e}");
+        Task::none()
+      }
+
+      Message::CopyText(text) => iced::clipboard::write(text),
+
+      Message::OpenUrl(url) => {
+        let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
+        Task::none()
+      }
+
+      Message::CopyPublicKey(key_id) => {
+        if let AppState::Ready(ref mut s) = self.state {
+          let key = s
+            .config
+            .keys
+            .iter()
+            .chain(s.local_keys.iter())
+            .find(|k| k.id == key_id)
+            .cloned();
+
+          if let Some(key) = key {
+            if let Some(ref pub_path) = key.public_path {
+              match std::fs::read_to_string(pub_path) {
+                Ok(content) => {
+                  s.copy_feedback = Some((key_id, std::time::Instant::now()));
+                  return iced::clipboard::write(content.trim().to_string());
+                }
+                Err(e) => tracing::warn!("Lecture clef publique échouée : {e}"),
+              }
+            }
+          }
+        }
+        Task::none()
+      }
+
+      Message::CopyFeedbackExpired => {
+        if let AppState::Ready(ref mut s) = self.state {
+          s.copy_feedback = None;
+        }
+        Task::none()
+      }
+
+      Message::KeyFilterChanged(filter) => {
+        if let AppState::Ready(ref mut s) = self.state {
+          s.key_filter = filter;
         }
         Task::none()
       }
@@ -633,7 +772,17 @@ impl App {
               let mut config = s.config.clone();
               if let Some(id) = editing_id {
                 if let Some(pos) = config.services.iter().position(|svc| svc.id == id) {
-                  config.services[pos] = service;
+                  let existing = &mut config.services[pos];
+                  existing.name = service.name;
+                  existing.service_type = service.service_type;
+                  existing.deploy_mode = service.deploy_mode;
+                  existing.params.url = service.params.url;
+                  existing.params.user = service.params.user;
+                  existing.params.port = service.params.port;
+                  if service.params.token_ref.is_some() {
+                    existing.params.token_ref = service.params.token_ref;
+                  }
+                  // active_key, pending_key, created_at, last_rotation, deployments : préservés
                 }
               } else {
                 config.services.push(service);
@@ -695,6 +844,14 @@ impl App {
 
       Message::DeleteService(id) => {
         if let AppState::Ready(ref s) = self.state {
+          let name = s
+            .config
+            .services
+            .iter()
+            .find(|svc| svc.id == id)
+            .map(|svc| svc.name.clone())
+            .unwrap_or_default();
+          crate::audit::append(crate::audit::AuditEvent::ServiceDeleted { service: &name });
           let mut config = s.config.clone();
           config.services.retain(|svc| svc.id != id);
           return Task::perform(
@@ -721,6 +878,9 @@ impl App {
 
       // ── Association clef existante ─────────────────────────────
       Message::AssignKeyToService { service_id, key_id } => {
+        if let AppState::Ready(ref mut s) = self.state {
+          s.key_filter.clear();
+        }
         if let AppState::Ready(ref s) = self.state {
           let mut config = s.config.clone();
           // Promouvoir la clef de local_keys → config.keys pour que son UUID soit stable
@@ -863,6 +1023,27 @@ impl App {
 
       Message::KeySaved(Ok(config)) => {
         if let AppState::Ready(ref mut s) = self.state {
+          // Audit : nouvelle clef générée
+          if let Some(ref kg) = s.key_gen {
+            let svc_name = s
+              .config
+              .services
+              .iter()
+              .find(|sv| sv.id == kg.service_id)
+              .map(|sv| sv.name.as_str())
+              .unwrap_or("?");
+            let new_key = config
+              .keys
+              .iter()
+              .find(|k| Some(k.service_id) == Some(Some(kg.service_id)));
+            if let Some(k) = new_key {
+              crate::audit::append(crate::audit::AuditEvent::KeyGenerated {
+                service: svc_name,
+                fingerprint: &k.fingerprint,
+                key_type: &k.key_type.to_string(),
+              });
+            }
+          }
           s.config = config;
           recompute_health(s);
         }
@@ -877,13 +1058,259 @@ impl App {
       // ── Déploiement ─────────────────────────────────────────────
       Message::OpenDeployFlow { service_id, key_id } => {
         if let AppState::Ready(ref mut s) = self.state {
-          s.deploy = Some(DeployState {
-            service_id,
-            key_id,
-            step: DeployStep::ChooseMode,
+          let service = s.config.services.iter().find(|svc| svc.id == service_id);
+          let blocker = service.and_then(|svc| {
+            use crate::config::model::ServiceType;
+            let needs_token = matches!(
+              svc.service_type,
+              ServiceType::GitHub | ServiceType::GitLab | ServiceType::GitLabSelfHosted
+            );
+            if !needs_token {
+              return None;
+            }
+            let token = s.secrets.token_for(svc);
+            match token {
+              None => Some(DeployBlocker::MissingToken {
+                service_name: svc.name.clone(),
+              }),
+              Some(ref t) => {
+                match crate::deployer::validate_token_format(t.expose(), &svc.service_type) {
+                  Err(e) => Some(DeployBlocker::InvalidTokenFormat {
+                    service_name: svc.name.clone(),
+                    reason: e.to_string(),
+                  }),
+                  Ok(()) => None,
+                }
+              }
+            }
           });
-          s.key_gen = None;
-          s.form = None;
+
+          if let Some(b) = blocker {
+            s.deploy_blocker = Some(b);
+          } else {
+            // Vérifications sync OK
+            let is_sk = s
+              .config
+              .keys
+              .iter()
+              .chain(s.local_keys.iter())
+              .find(|k| k.id == key_id)
+              .map(|k| k.yubikey)
+              .unwrap_or(false);
+
+            let svc = service.cloned();
+            let secrets = s.secrets.clone();
+
+            // Clef SK → afficher l'avertissement avant le probe
+            if is_sk {
+              s.deploy = Some(DeployState {
+                service_id,
+                key_id,
+                step: DeployStep::SkPreFlight,
+              });
+              s.key_gen = None;
+              s.form = None;
+              return Task::none();
+            }
+
+            s.deploy = Some(DeployState {
+              service_id,
+              key_id,
+              step: DeployStep::Preflight,
+            });
+            s.key_gen = None;
+            s.form = None;
+
+            if let Some(svc) = svc {
+              use crate::config::model::ServiceType;
+              let probe_task: Task<Message> = match svc.service_type {
+                ServiceType::GitHub => {
+                  let token = secrets.token_for(&svc);
+                  Task::perform(
+                    async move {
+                      crate::deployer::github::GitHubApiDeployer::new(token)
+                        .probe_token()
+                        .await
+                    },
+                    Message::PreflightCompleted,
+                  )
+                }
+                ServiceType::GitLab => {
+                  let token = secrets.token_for(&svc);
+                  Task::perform(
+                    async move {
+                      crate::deployer::gitlab::GitLabApiDeployer::new(
+                        "https://gitlab.com".into(),
+                        token,
+                      )
+                      .probe_token()
+                      .await
+                    },
+                    Message::PreflightCompleted,
+                  )
+                }
+                ServiceType::GitLabSelfHosted => {
+                  let token = secrets.token_for(&svc);
+                  let base = svc
+                    .params
+                    .url
+                    .clone()
+                    .unwrap_or_else(|| "https://gitlab.com".into());
+                  Task::perform(
+                    async move {
+                      crate::deployer::gitlab::GitLabApiDeployer::new(base, token)
+                        .probe_token()
+                        .await
+                    },
+                    Message::PreflightCompleted,
+                  )
+                }
+                _ => Task::perform(async { Ok(()) }, Message::PreflightCompleted),
+              };
+              return probe_task;
+            }
+          }
+        }
+        Task::none()
+      }
+
+      Message::SkPreFlightConfirmed => {
+        if let AppState::Ready(ref mut s) = self.state {
+          if let Some(ref mut d) = s.deploy {
+            d.step = DeployStep::Preflight;
+            let service_id = d.service_id;
+            let svc = s
+              .config
+              .services
+              .iter()
+              .find(|sv| sv.id == service_id)
+              .cloned();
+            let secrets = s.secrets.clone();
+
+            if let Some(svc) = svc {
+              use crate::config::model::ServiceType;
+              let probe: Task<Message> = match svc.service_type {
+                ServiceType::GitHub => {
+                  let token = secrets.token_for(&svc);
+                  Task::perform(
+                    async move {
+                      crate::deployer::github::GitHubApiDeployer::new(token)
+                        .probe_token()
+                        .await
+                    },
+                    Message::PreflightCompleted,
+                  )
+                }
+                ServiceType::GitLab => {
+                  let token = secrets.token_for(&svc);
+                  Task::perform(
+                    async move {
+                      crate::deployer::gitlab::GitLabApiDeployer::new(
+                        "https://gitlab.com".into(),
+                        token,
+                      )
+                      .probe_token()
+                      .await
+                    },
+                    Message::PreflightCompleted,
+                  )
+                }
+                ServiceType::GitLabSelfHosted => {
+                  let token = secrets.token_for(&svc);
+                  let base = svc
+                    .params
+                    .url
+                    .clone()
+                    .unwrap_or_else(|| "https://gitlab.com".into());
+                  Task::perform(
+                    async move {
+                      crate::deployer::gitlab::GitLabApiDeployer::new(base, token)
+                        .probe_token()
+                        .await
+                    },
+                    Message::PreflightCompleted,
+                  )
+                }
+                _ => Task::perform(async { Ok(()) }, Message::PreflightCompleted),
+              };
+              return probe;
+            }
+          }
+        }
+        Task::none()
+      }
+
+      Message::PreflightCompleted(Ok(())) => {
+        if let AppState::Ready(ref mut s) = self.state {
+          if let Some(ref mut d) = s.deploy {
+            let is_external_cm = s
+              .config
+              .services
+              .iter()
+              .find(|svc| svc.id == d.service_id)
+              .map(|svc| svc.deploy_mode == crate::config::model::DeployMode::ExternalCm)
+              .unwrap_or(false);
+
+            if is_external_cm {
+              let pub_key = s
+                .config
+                .keys
+                .iter()
+                .chain(s.local_keys.iter())
+                .find(|k| k.id == d.key_id)
+                .and_then(|k| k.public_path.as_ref())
+                .and_then(|p| std::fs::read_to_string(p).ok())
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+              d.step = DeployStep::ExternalCmDeploy {
+                public_key: pub_key,
+              };
+            } else {
+              d.step = DeployStep::ChooseMode;
+            }
+          }
+        }
+        Task::none()
+      }
+
+      Message::PreflightCompleted(Err(e)) => {
+        if let AppState::Ready(ref mut s) = self.state {
+          let service_name = s
+            .deploy
+            .as_ref()
+            .and_then(|d| s.config.services.iter().find(|svc| svc.id == d.service_id))
+            .map(|svc| svc.name.clone())
+            .unwrap_or_default();
+          s.deploy = None;
+          s.deploy_blocker = Some(match &e {
+            crate::error::AppError::ApiUnauthorized { .. } => {
+              DeployBlocker::TokenProbeUnauthorized { service_name }
+            }
+            _ => DeployBlocker::TokenProbeError {
+              service_name,
+              message: e.to_string(),
+            },
+          });
+        }
+        Task::none()
+      }
+
+      Message::DismissDeployBlocker => {
+        if let AppState::Ready(ref mut s) = self.state {
+          s.deploy_blocker = None;
+        }
+        Task::none()
+      }
+
+      Message::OpenEditServiceAtStep { service_id, step } => {
+        if let AppState::Ready(ref mut s) = self.state {
+          if let Some(svc) = s.config.services.iter().find(|svc| svc.id == service_id) {
+            let mut form = ServiceFormState::from_service(svc);
+            form.step = step;
+            s.form = Some(form);
+            s.deploy_blocker = None;
+          }
         }
         Task::none()
       }
@@ -963,6 +1390,10 @@ impl App {
                 d.step = DeployStep::GuidedCommand { command };
               }
             }
+            DeployMode::ExternalCm => {
+              // Ne devrait pas arriver : ExternalCm est routé dans PreflightCompleted
+              // avant d'atteindre DeployModeSelected
+            }
           }
         }
         Task::none()
@@ -1039,15 +1470,39 @@ impl App {
 
       Message::VerifyCompleted(result) => {
         if let AppState::Ready(ref mut s) = self.state {
-          let verified = match result {
-            Ok(v) => v,
+          let key_id = s.deploy.as_ref().map(|d| d.key_id);
+          let is_sk = key_id
+            .and_then(|id| {
+              s.config
+                .keys
+                .iter()
+                .chain(s.local_keys.iter())
+                .find(|k| k.id == id)
+            })
+            .map(|k| k.yubikey)
+            .unwrap_or(false);
+
+          let step = match result {
+            Ok(true) => DeployStep::Success { verified: true },
+            Ok(false) if is_sk => DeployStep::Error(
+              "Vérification SSH échouée. \
+               Ne révoquez pas l'ancienne clef YubiKey — \
+               la nouvelle clef n'est pas confirmée."
+                .to_string(),
+            ),
+            Ok(false) => DeployStep::Success { verified: false },
+            Err(e) if is_sk => DeployStep::Error(format!(
+              "Vérification SSH échouée : {e}. \
+               Ne révoquez pas l'ancienne clef YubiKey."
+            )),
             Err(e) => {
               tracing::warn!("Vérification post-déploiement échouée (non bloquant) : {e}");
-              false
+              DeployStep::Success { verified: false }
             }
           };
+
           if let Some(ref mut d) = s.deploy {
-            d.step = DeployStep::Success { verified };
+            d.step = step;
           }
         }
         Task::none()
@@ -1058,10 +1513,28 @@ impl App {
           let service_id = s.deploy.as_ref().map(|d| d.service_id);
           let key_id = s.deploy.as_ref().map(|d| d.key_id);
 
+          let is_external_cm = service_id
+            .and_then(|sid| s.config.services.iter().find(|sv| sv.id == sid))
+            .map(|sv| sv.deploy_mode == crate::config::model::DeployMode::ExternalCm)
+            .unwrap_or(false);
+
           if let Some(sid) = service_id {
             if let Some(svc) = s.config.services.iter_mut().find(|sv| sv.id == sid) {
               svc.last_rotation = Some(chrono::Local::now().date_naive());
             }
+          }
+
+          let config = s.config.clone();
+          let save_task = Task::perform(
+            crate::config::writer::save_config_owned(config),
+            Message::DeployAndSaved,
+          );
+
+          if is_external_cm {
+            if let Some(ref mut d) = s.deploy {
+              d.step = DeployStep::Success { verified: false };
+            }
+            return save_task;
           }
 
           let verify_params = key_id.and_then(|kid| {
@@ -1081,12 +1554,6 @@ impl App {
             let priv_path = key.private_path.clone()?;
             Some((priv_path, user, host, port))
           });
-
-          let config = s.config.clone();
-          let save_task = Task::perform(
-            crate::config::writer::save_config_owned(config),
-            Message::DeployAndSaved,
-          );
 
           if let Some((priv_path, user, host, port)) = verify_params {
             if let Some(ref mut d) = s.deploy {
@@ -1306,6 +1773,27 @@ impl App {
 
       Message::RevokeSaved(Ok(config)) => {
         if let AppState::Ready(ref mut s) = self.state {
+          if let Some(ref rv) = s.revoke {
+            let svc_name = s
+              .config
+              .services
+              .iter()
+              .find(|sv| sv.id == rv.service_id)
+              .map(|sv| sv.name.as_str())
+              .unwrap_or("?");
+            let fp = s
+              .config
+              .keys
+              .iter()
+              .find(|k| k.id == rv.key_id)
+              .map(|k| k.fingerprint.as_str())
+              .unwrap_or("?");
+            crate::audit::append(crate::audit::AuditEvent::KeyRevoked {
+              service: svc_name,
+              fingerprint: fp,
+              result: "ok",
+            });
+          }
           s.config = config;
           recompute_health(s);
         }
@@ -1341,6 +1829,10 @@ impl App {
   }
 
   pub fn subscription(&self) -> Subscription<Message> {
-    Subscription::none()
+    if matches!(&self.state, AppState::Ready(s) if s.copy_feedback.is_some()) {
+      iced::time::every(std::time::Duration::from_secs(2)).map(|_| Message::CopyFeedbackExpired)
+    } else {
+      Subscription::none()
+    }
   }
 }

@@ -45,6 +45,33 @@ impl GitLabApiDeployer {
   fn keys_url(&self) -> String {
     format!("{}/api/v4/user/keys", self.base_url.trim_end_matches('/'))
   }
+
+  fn user_url(&self) -> String {
+    format!("{}/api/v4/user", self.base_url.trim_end_matches('/'))
+  }
+
+  /// Sonde le token via GET /api/v4/user — vérifie qu'il est valide et autorisé.
+  pub async fn probe_token(&self) -> Result<(), AppError> {
+    let token = self.auth_header()?;
+    let resp = self
+      .client
+      .get_json(&self.user_url(), &[("Private-Token", token.as_str())])
+      .await?;
+    match resp.status {
+      200 => Ok(()),
+      401 | 403 => Err(AppError::ApiUnauthorized {
+        service: "GitLab".into(),
+      }),
+      status => Err(AppError::ApiError {
+        service: "GitLab".into(),
+        status,
+        message: resp.body["message"]
+          .as_str()
+          .unwrap_or("erreur inconnue")
+          .to_string(),
+      }),
+    }
+  }
 }
 
 #[async_trait]
@@ -281,5 +308,81 @@ mod tests {
     ctx.public_key_path = Some("/tmp/key.pub".into());
     let cmd = deployer.guided_command(&ctx).unwrap();
     assert!(cmd.contains("git.example.com"));
+  }
+
+  // ── Tests probe_token ─────────────────────────────────────────────────────
+
+  fn make_probe_deployer(client: Box<dyn HttpClient>) -> GitLabApiDeployer {
+    GitLabApiDeployer::with_client(
+      "https://gitlab.com".into(),
+      Some(ApiToken::new("glpat-test".into())),
+      client,
+    )
+  }
+
+  #[tokio::test]
+  async fn probe_token_200_passe() {
+    let client = Box::new(FakeHttpClient::responds_with(200, json!({"id": 1})));
+    let deployer = make_probe_deployer(client);
+    assert!(deployer.probe_token().await.is_ok());
+  }
+
+  #[tokio::test]
+  async fn probe_token_401_retourne_unauthorized() {
+    let client = Box::new(FakeHttpClient::responds_with(
+      401,
+      json!({"message": "401 Unauthorized"}),
+    ));
+    let deployer = make_probe_deployer(client);
+    assert!(matches!(
+      deployer.probe_token().await,
+      Err(crate::error::AppError::ApiUnauthorized { .. })
+    ));
+  }
+
+  #[tokio::test]
+  async fn probe_token_403_retourne_unauthorized() {
+    let client = Box::new(FakeHttpClient::responds_with(
+      403,
+      json!({"message": "Forbidden"}),
+    ));
+    let deployer = make_probe_deployer(client);
+    assert!(matches!(
+      deployer.probe_token().await,
+      Err(crate::error::AppError::ApiUnauthorized { .. })
+    ));
+  }
+
+  #[tokio::test]
+  async fn probe_token_429_retourne_api_error() {
+    let client = Box::new(FakeHttpClient::responds_with(
+      429,
+      json!({"message": "rate limit exceeded"}),
+    ));
+    let deployer = make_probe_deployer(client);
+    assert!(matches!(
+      deployer.probe_token().await,
+      Err(crate::error::AppError::ApiError { status: 429, .. })
+    ));
+  }
+
+  #[tokio::test]
+  async fn probe_token_timeout_retourne_erreur() {
+    let client = Box::new(FakeHttpClient::fails_with_timeout());
+    let deployer = make_probe_deployer(client);
+    assert!(matches!(
+      deployer.probe_token().await,
+      Err(crate::error::AppError::SubprocessTimeout { .. })
+    ));
+  }
+
+  #[tokio::test]
+  async fn probe_token_absent_rejete_sans_appel_http() {
+    let client = Box::new(FakeHttpClient::new(vec![])); // ne doit pas être consommé
+    let deployer = GitLabApiDeployer::with_client("https://gitlab.com".into(), None, client);
+    assert!(matches!(
+      deployer.probe_token().await,
+      Err(crate::error::AppError::Validation { .. })
+    ));
   }
 }

@@ -91,6 +91,41 @@ pub trait KeyDeployer: Send + Sync {
   fn guided_command(&self, ctx: &DeployContext) -> Option<String>;
 }
 
+// ── Validation pré-vol ────────────────────────────────────────────────────
+
+/// Vérifie le format d'un token API sans appel réseau.
+pub fn validate_token_format(token: &str, service_type: &ServiceType) -> Result<(), AppError> {
+  if token.trim().is_empty() {
+    return Err(AppError::Validation {
+      field: "token".into(),
+      reason: "Le token est vide.".into(),
+    });
+  }
+  match service_type {
+    ServiceType::GitHub => {
+      if !token.starts_with("ghp_")
+        && !token.starts_with("github_pat_")
+        && !token.starts_with("gho_")
+      {
+        return Err(AppError::Validation {
+          field: "token".into(),
+          reason: "Format de token GitHub invalide (attendu : ghp_… ou github_pat_…).".into(),
+        });
+      }
+    }
+    ServiceType::GitLab | ServiceType::GitLabSelfHosted => {
+      if !token.starts_with("glpat-") && token.len() < 20 {
+        return Err(AppError::Validation {
+          field: "token".into(),
+          reason: "Format de token GitLab invalide (attendu : glpat-…).".into(),
+        });
+      }
+    }
+    _ => {}
+  }
+  Ok(())
+}
+
 // ── Factory ────────────────────────────────────────────────────────────────
 
 /// Sélectionne l'implémentation selon le type de service.
@@ -110,7 +145,7 @@ pub fn deployer_for(service: &Service, secrets: &Secrets) -> Box<dyn KeyDeployer
         .unwrap_or_else(|| "https://gitlab.com".into());
       Box::new(gitlab::GitLabApiDeployer::new(base, token))
     }
-    ServiceType::SshGeneric | ServiceType::Manual => Box::new(ssh::SshCopyIdDeployer::new()),
+    ServiceType::SshGeneric => Box::new(ssh::SshCopyIdDeployer::new()),
   }
 }
 
@@ -195,3 +230,54 @@ pub mod fake {
 // Référence non utilisée dans le type — Arc<dyn CommandRunner> utilisé dans ssh.rs
 #[allow(dead_code)]
 fn _unused_runner_import(_: Arc<dyn CommandRunner>) {}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn validate_token_vide_rejete() {
+    assert!(validate_token_format("", &ServiceType::GitHub).is_err());
+    assert!(validate_token_format("   ", &ServiceType::GitLab).is_err());
+  }
+
+  #[test]
+  fn validate_token_github_prefixes_valides() {
+    assert!(validate_token_format("ghp_abc123", &ServiceType::GitHub).is_ok());
+    assert!(validate_token_format("github_pat_abc123", &ServiceType::GitHub).is_ok());
+    assert!(validate_token_format("gho_abc123", &ServiceType::GitHub).is_ok());
+  }
+
+  #[test]
+  fn validate_token_github_format_invalide() {
+    assert!(validate_token_format("glpat-xxx", &ServiceType::GitHub).is_err());
+    assert!(validate_token_format("Bearer token", &ServiceType::GitHub).is_err());
+    assert!(validate_token_format("abc123", &ServiceType::GitHub).is_err());
+  }
+
+  #[test]
+  fn validate_token_gitlab_glpat_valide() {
+    assert!(validate_token_format("glpat-abc123xyz", &ServiceType::GitLab).is_ok());
+    assert!(validate_token_format("glpat-abc123xyz", &ServiceType::GitLabSelfHosted).is_ok());
+  }
+
+  #[test]
+  fn validate_token_gitlab_long_sans_prefixe_valide() {
+    // Token ≥ 20 chars sans préfixe glpat- → accepté (anciens tokens GitLab)
+    assert!(validate_token_format("abcdefghijklmnopqrst", &ServiceType::GitLab).is_ok());
+  }
+
+  #[test]
+  fn validate_token_gitlab_format_invalide() {
+    // Trop court et pas de préfixe
+    assert!(validate_token_format("short", &ServiceType::GitLab).is_err());
+    assert!(validate_token_format("ghp_xxx", &ServiceType::GitLab).is_err());
+  }
+
+  #[test]
+  fn validate_token_ssh_generic_toujours_ok() {
+    // SshGeneric et Manual n'utilisent pas de token API
+    assert!(validate_token_format("n'importe quoi", &ServiceType::SshGeneric).is_ok());
+    assert!(validate_token_format("n'importe quoi", &ServiceType::SshGeneric).is_ok());
+  }
+}

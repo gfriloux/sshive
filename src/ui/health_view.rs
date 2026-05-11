@@ -194,6 +194,8 @@ fn reason_text(reason: &HealthReason) -> &'static str {
     HealthReason::KeyUnprotected { .. } => "Clef non chiffrée",
     HealthReason::RotationOverdue { .. } => "Rotation en retard",
     HealthReason::PendingDeployment => "Déploiement en attente",
+    HealthReason::NoApiToken => "Token manquant",
+    HealthReason::HardwareKeyHandleNotBackedUp { .. } => "Fichier clef YubiKey à sauvegarder",
   }
 }
 

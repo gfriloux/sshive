@@ -88,6 +88,7 @@ async fn parse_pub_key_file(path: &Path) -> Result<Option<SshKey>, AppError> {
     private_path: None,
     public_path: Some(path.to_path_buf()),
     service_id: None,
+    backup_prompted: false,
   }))
 }
 

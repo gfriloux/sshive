@@ -2,10 +2,10 @@ use iced::widget::{column, container, row, scrollable, text};
 use iced::{Alignment, Background, Border, Element, Length};
 
 use crate::app::message::Message;
-use crate::config::model::{Service, SshKey};
+use crate::config::model::{DeployMode, Service, SshKey};
 use crate::ui::theme::{
-  BACKGROUND_BASE, BACKGROUND_ELEVATED, BORDER_DEFAULT, BORDER_SUBTLE, FONT_MEDIUM, FONT_SEMIBOLD,
-  TEXT_DISABLED, TEXT_PRIMARY, TEXT_SECONDARY, WARNING_AMBER,
+  BACKGROUND_BASE, BACKGROUND_ELEVATED, BACKGROUND_SUBTLE, BORDER_DEFAULT, BORDER_SUBTLE,
+  FONT_MEDIUM, FONT_SEMIBOLD, TEXT_DISABLED, TEXT_PRIMARY, TEXT_SECONDARY, WARNING_AMBER,
 };
 use crate::ui::widgets::{
   age_indicator, count_services_using_key, fingerprint_text, service_type_badge, shared_key_badge,
@@ -180,7 +180,25 @@ fn view_service_row<'a>(
   } else {
     iced::widget::Space::new().width(0).into()
   };
-  let badges = row![yk, shared].align_y(Alignment::Center);
+  let ext: Element<Message> = if service.deploy_mode == DeployMode::ExternalCm {
+    row![
+      iced::widget::Space::new().width(4),
+      container(text("EXT").size(10).font(FONT_MEDIUM).color(TEXT_DISABLED),)
+        .padding([2, 5])
+        .style(|_: &iced::Theme| container::Style {
+          background: Some(Background::Color(BACKGROUND_SUBTLE)),
+          border: Border {
+            radius: 3.0.into(),
+            ..Default::default()
+          },
+          ..Default::default()
+        }),
+    ]
+    .into()
+  } else {
+    iced::widget::Space::new().width(0).into()
+  };
+  let badges = row![yk, shared, ext].align_y(Alignment::Center);
 
   let service_id = service.id;
 

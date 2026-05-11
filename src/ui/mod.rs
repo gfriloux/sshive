@@ -112,8 +112,10 @@ pub fn view_ready(state: &ReadyState) -> Element<'_, Message> {
       .into(),
   };
 
-  // Colonne 3 : deploy > keygen > formulaire > détail
-  let detail: Element<Message> = if let Some(ref d) = state.deploy {
+  // Colonne 3 : blocker > deploy > keygen > formulaire > détail
+  let detail: Element<Message> = if let Some(ref b) = state.deploy_blocker {
+    deploy_flow::view_blocker(b)
+  } else if let Some(ref d) = state.deploy {
     deploy_flow::view(d)
   } else if let Some(ref kg) = state.key_gen {
     key_gen_flow::view(kg)

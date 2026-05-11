@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
-use iced::widget::{column, container, row, text};
+use iced::widget::{column, container, row, scrollable, text, text_input};
 use iced::{Alignment, Background, Border, Element, Length};
 use uuid::Uuid;
 
@@ -35,64 +35,75 @@ pub fn view_service_detail<'a>(service_id: Uuid, state: &'a ReadyState) -> Eleme
 
   let age = age_indicator(service.last_rotation);
 
-  column![
-    // En-tête service
-    container(
-      row![
-        service_type_badge(&service.service_type),
-        iced::widget::Space::new().width(10),
-        text(service.name.clone())
-          .font(FONT_SEMIBOLD)
-          .size(18)
-          .color(TEXT_PRIMARY),
-      ]
-      .align_y(Alignment::Center),
-    )
-    .padding(iced::Padding {
-      top: 24.0,
-      right: 24.0,
-      bottom: 8.0,
-      left: 24.0
-    }),
-    container(
-      text(format!(
-        "Créé le {}",
-        service.created_at.format("%d %b. %Y")
-      ))
-      .size(12)
-      .color(TEXT_SECONDARY),
-    )
-    .padding(iced::Padding {
-      top: 0.0,
-      right: 24.0,
-      bottom: 16.0,
-      left: 24.0
-    }),
-    iced::widget::rule::horizontal(1).style(|_: &iced::Theme| iced::widget::rule::Style {
-      color: BORDER_DEFAULT,
-      radius: 0.0.into(),
-      fill_mode: iced::widget::rule::FillMode::Full,
-      snap: true,
-    }),
-    // Section connexion
-    if service.params.url.is_some() || service.params.user.is_some() {
-      view_connection_section(service)
-    } else {
-      iced::widget::Space::new().height(0).into()
-    },
-    // Section clef active
-    view_key_section(service_id, active_key, &age, service.last_rotation, state),
-    // Section révocation clefs anciennes
-    view_revoke_section(service_id, service.active_key, state),
-    // Actions
-    view_actions(service_id),
-  ]
+  scrollable(
+    column![
+      // En-tête service
+      container(
+        row![
+          service_type_badge(&service.service_type),
+          iced::widget::Space::new().width(10),
+          text(service.name.clone())
+            .font(FONT_SEMIBOLD)
+            .size(18)
+            .color(TEXT_PRIMARY),
+        ]
+        .align_y(Alignment::Center),
+      )
+      .padding(iced::Padding {
+        top: 24.0,
+        right: 24.0,
+        bottom: 8.0,
+        left: 24.0
+      }),
+      container(
+        text(format!(
+          "Créé le {}",
+          service.created_at.format("%d %b. %Y")
+        ))
+        .size(12)
+        .color(TEXT_SECONDARY),
+      )
+      .padding(iced::Padding {
+        top: 0.0,
+        right: 24.0,
+        bottom: 16.0,
+        left: 24.0
+      }),
+      iced::widget::rule::horizontal(1).style(|_: &iced::Theme| iced::widget::rule::Style {
+        color: BORDER_DEFAULT,
+        radius: 0.0.into(),
+        fill_mode: iced::widget::rule::FillMode::Full,
+        snap: true,
+      }),
+      // Section connexion
+      {
+        use crate::config::model::DeployMode;
+        let show = service.params.url.is_some()
+          || service.params.user.is_some()
+          || service.deploy_mode == DeployMode::ExternalCm;
+        if show {
+          view_connection_section(service)
+        } else {
+          iced::widget::Space::new().height(0).into()
+        }
+      },
+      // Section clef active
+      view_key_section(service_id, active_key, &age, service.last_rotation, state),
+      // Section révocation clefs anciennes
+      view_revoke_section(service_id, service.active_key, state),
+      // Actions
+      view_actions(service_id),
+    ]
+    .width(Length::Fill),
+  )
   .width(Length::Fill)
   .height(Length::Fill)
   .into()
 }
 
 fn view_connection_section(service: &crate::config::model::Service) -> Element<'static, Message> {
+  use crate::config::model::DeployMode;
+
   let mut rows: Vec<Element<Message>> = vec![section_label("CONNEXION")];
 
   if let Some(url) = &service.params.url {
@@ -107,6 +118,13 @@ fn view_connection_section(service: &crate::config::model::Service) -> Element<'
       &format!("{port}{}", if port == 22 { " (par défaut)" } else { "" }),
     ));
   }
+
+  let deploy_label = match service.deploy_mode {
+    DeployMode::Automatic => "Automatique (ssh-copy-id)",
+    DeployMode::Guided => "Guidé (commande à copier)",
+    DeployMode::ExternalCm => "Géré externalement (NixOS, Ansible…)",
+  };
+  rows.push(field_row("Déploiement", deploy_label));
 
   container(column(rows).spacing(6))
     .padding([12, 24])
@@ -131,6 +149,8 @@ fn view_key_section<'a>(
         } else {
           iced::widget::Space::new().width(0).into()
         },
+        iced::widget::Space::new().width(Length::Fill),
+        copy_key_button(key.id, &state.copy_feedback),
       ]
       .align_y(Alignment::Center),
       iced::widget::Space::new().height(4),
@@ -155,27 +175,52 @@ fn view_key_section<'a>(
   };
 
   let primary_action: Element<Message> = if let Some(key) = active_key {
-    iced::widget::button(text("Faire pivoter la clef").size(13).color(TEXT_PRIMARY))
-      .on_press(Message::OpenDeployFlow {
-        service_id,
-        key_id: key.id,
-      })
-      .style(|_, status| iced::widget::button::Style {
-        background: Some(Background::Color(
-          if matches!(status, iced::widget::button::Status::Hovered) {
-            ACCENT_HOVER
-          } else {
-            ACCENT_PRIMARY
+    let has_private_key = key.private_path.is_some();
+    if has_private_key {
+      iced::widget::button(text("Faire pivoter la clef").size(13).color(TEXT_PRIMARY))
+        .on_press(Message::OpenDeployFlow {
+          service_id,
+          key_id: key.id,
+        })
+        .style(|_, status| iced::widget::button::Style {
+          background: Some(Background::Color(
+            if matches!(status, iced::widget::button::Status::Hovered) {
+              ACCENT_HOVER
+            } else {
+              ACCENT_PRIMARY
+            },
+          )),
+          border: Border {
+            radius: 6.0.into(),
+            ..Default::default()
           },
-        )),
-        border: Border {
-          radius: 6.0.into(),
           ..Default::default()
-        },
-        ..Default::default()
-      })
-      .padding([8, 16])
+        })
+        .padding([8, 16])
+        .into()
+    } else {
+      column![
+        iced::widget::button(text("Faire pivoter la clef").size(13).color(TEXT_DISABLED))
+          .style(|_, _| iced::widget::button::Style {
+            background: Some(Background::Color(crate::ui::theme::BACKGROUND_SUBTLE)),
+            border: Border {
+              radius: 6.0.into(),
+              ..Default::default()
+            },
+            ..Default::default()
+          })
+          .padding([8, 16]),
+        iced::widget::Space::new().height(4),
+        text("Clef privée introuvable — gérée par un outil externe (sops, age…).")
+          .size(11)
+          .color(TEXT_DISABLED),
+        text("La rotation nécessite que SSHive gère le fichier de clef privée.")
+          .size(11)
+          .color(TEXT_DISABLED),
+      ]
+      .spacing(0)
       .into()
+    }
   } else {
     iced::widget::button(
       text("Générer une nouvelle clef")
@@ -203,7 +248,7 @@ fn view_key_section<'a>(
 
   // Le picker n'est affiché que quand aucune clef n'est encore assignée (B2/B3)
   let assign_picker: Element<Message> = if active_key.is_none() {
-    view_assign_picker(service_id, &state.local_keys)
+    view_assign_picker(service_id, &state.local_keys, &state.key_filter)
   } else {
     iced::widget::Space::new().height(0).into()
   };
@@ -233,6 +278,7 @@ fn view_key_section<'a>(
 fn view_assign_picker<'a>(
   service_id: Uuid,
   local_keys: &'a [crate::config::model::SshKey],
+  filter: &'a str,
 ) -> Element<'a, Message> {
   use crate::config::model::KeyType;
   use crate::ui::widgets::service_type_badge;
@@ -241,7 +287,56 @@ fn view_assign_picker<'a>(
     return iced::widget::Space::new().height(0).into();
   }
 
-  let cards: Vec<Element<Message>> = local_keys
+  let filter_lc = filter.to_lowercase();
+  let filtered_keys: Vec<&crate::config::model::SshKey> = local_keys
+    .iter()
+    .filter(|k| {
+      if filter_lc.is_empty() {
+        return true;
+      }
+      k.comment.to_lowercase().contains(&filter_lc)
+        || k.fingerprint.to_lowercase().contains(&filter_lc)
+    })
+    .collect();
+
+  let show_filter = local_keys.len() > 8;
+
+  let filter_input: Element<Message> = if show_filter {
+    text_input("Filtrer par nom ou empreinte…", filter)
+      .on_input(Message::KeyFilterChanged)
+      .padding(8)
+      .size(12)
+      .style(|_theme: &iced::Theme, status| {
+        use crate::ui::theme::{
+          ACCENT_PRIMARY, ACCENT_SUBTLE, BACKGROUND_ELEVATED, BORDER_DEFAULT, TEXT_DISABLED,
+          TEXT_PRIMARY,
+        };
+        iced::widget::text_input::Style {
+          background: iced::Background::Color(BACKGROUND_ELEVATED),
+          border: iced::Border {
+            radius: 6.0.into(),
+            color: match status {
+              iced::widget::text_input::Status::Focused { .. } => ACCENT_PRIMARY,
+              _ => BORDER_DEFAULT,
+            },
+            width: if matches!(status, iced::widget::text_input::Status::Focused { .. }) {
+              2.0
+            } else {
+              1.0
+            },
+          },
+          icon: TEXT_DISABLED,
+          placeholder: TEXT_DISABLED,
+          value: TEXT_PRIMARY,
+          selection: ACCENT_SUBTLE,
+        }
+      })
+      .into()
+  } else {
+    iced::widget::Space::new().height(0).into()
+  };
+
+  let cards: Vec<Element<Message>> = filtered_keys
     .iter()
     .map(|k| {
       let key_id = k.id;
@@ -343,7 +438,10 @@ fn view_assign_picker<'a>(
 
   column![
     section_label("ATTACHER UNE CLEF EXISTANTE"),
-    column(cards).spacing(6),
+    filter_input,
+    scrollable(column(cards).spacing(6))
+      .height(Length::Fixed(240.0))
+      .width(Length::Fill),
   ]
   .spacing(6)
   .width(Length::Fill)
@@ -618,6 +716,8 @@ pub fn view_key_detail<'a>(key_id: Uuid, state: &'a ReadyState) -> Element<'a, M
         },
       ]
       .align_y(Alignment::Center),
+      iced::widget::Space::new().height(4),
+      copy_key_button(key.id, &state.copy_feedback),
     ],)
     .padding(iced::Padding {
       top: 24.0,
@@ -631,6 +731,61 @@ pub fn view_key_detail<'a>(key_id: Uuid, state: &'a ReadyState) -> Element<'a, M
       fill_mode: iced::widget::rule::FillMode::Full,
       snap: true,
     }),
+    // Prompt sauvegarde handle SK
+    {
+      let backup_block: Element<Message> = if key.yubikey && !key.backup_prompted {
+        let key_id = key.id;
+        container(
+          column![
+            row![
+              text("⚠").size(13).color(WARNING_AMBER),
+              iced::widget::Space::new().width(8),
+              text("Sauvegardez le fichier de clef YubiKey.")
+                .size(12)
+                .color(TEXT_PRIMARY),
+            ]
+            .align_y(Alignment::Center),
+            iced::widget::Space::new().height(6),
+            text("Ce fichier est indispensable — sans lui, la YubiKey seule ne suffit pas.")
+              .size(11)
+              .color(TEXT_SECONDARY),
+            text(format!(
+              "Fichier : {}",
+              key
+                .private_path
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default()
+            ))
+            .size(10)
+            .color(TEXT_DISABLED),
+            iced::widget::Space::new().height(8),
+            iced::widget::button(
+              text("Compris — j'ai sauvegardé")
+                .size(11)
+                .color(TEXT_PRIMARY)
+            )
+            .on_press(Message::DismissBackupPrompt(key_id))
+            .style(|_, _| iced::widget::button::Style {
+              background: Some(Background::Color(WARNING_AMBER)),
+              border: Border {
+                radius: 4.0.into(),
+                ..Default::default()
+              },
+              ..Default::default()
+            })
+            .padding([4, 10]),
+          ]
+          .spacing(2),
+        )
+        .padding([12, 24])
+        .width(Length::Fill)
+        .into()
+      } else {
+        iced::widget::Space::new().height(0).into()
+      };
+      backup_block
+    },
     // Propriétés
     container(
       column![
@@ -740,6 +895,37 @@ pub fn view_empty_panel() -> Element<'static, Message> {
 fn empty_panel() -> Element<'static, Message> {
   container(text("Service introuvable").size(13).color(TEXT_DISABLED))
     .padding(24)
+    .into()
+}
+
+fn copy_key_button(
+  key_id: Uuid,
+  copy_feedback: &Option<(Uuid, std::time::Instant)>,
+) -> Element<'static, Message> {
+  let is_copied = copy_feedback
+    .as_ref()
+    .map(|(id, _)| *id == key_id)
+    .unwrap_or(false);
+
+  let (label, color) = if is_copied {
+    ("✓ Copié", SUCCESS_GREEN)
+  } else {
+    ("Copier la clef publique", TEXT_ACCENT)
+  };
+
+  iced::widget::button(text(label).size(11).color(color))
+    .on_press(Message::CopyPublicKey(key_id))
+    .style(|_, status| iced::widget::button::Style {
+      background: Some(Background::Color(
+        if matches!(status, iced::widget::button::Status::Hovered) {
+          BACKGROUND_ELEVATED
+        } else {
+          iced::Color::TRANSPARENT
+        },
+      )),
+      ..Default::default()
+    })
+    .padding([4, 8])
     .into()
 }
 

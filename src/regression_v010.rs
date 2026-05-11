@@ -87,7 +87,7 @@ services:
     let mut config = Config::default();
     config.services.push(Service {
       id: fixed_id,
-      ..make_service(ServiceType::Manual)
+      ..make_service(ServiceType::SshGeneric)
     });
 
     save_to_path(&config, &path).await.unwrap();
@@ -102,7 +102,6 @@ services:
       ServiceType::GitLab,
       ServiceType::GitLabSelfHosted,
       ServiceType::SshGeneric,
-      ServiceType::Manual,
     ];
     for st in types {
       let dir = TempDir::new().unwrap();
@@ -183,7 +182,6 @@ services:
       "GitLab (self-hosted)"
     );
     assert_eq!(ServiceType::SshGeneric.to_string(), "SSH générique");
-    assert_eq!(ServiceType::Manual.to_string(), "Manuel");
   }
 
   #[test]
@@ -267,6 +265,7 @@ services:
       private_path: None,
       public_path: None,
       service_id: None,
+      backup_prompted: false,
     });
 
     save_to_path(&config, &path).await.unwrap();

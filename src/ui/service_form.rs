@@ -1,14 +1,14 @@
 use iced::widget::{column, container, row, scrollable, text, text_input};
 use iced::{Alignment, Background, Border, Element, Length};
 
-use crate::app::message::{FormField, Message};
+use crate::app::message::{FormField, HelpId, Message};
 use crate::app::ServiceFormState;
-use crate::config::model::ServiceType;
+use crate::config::model::{DeployMode, ServiceType};
 use crate::ui::stepper::view_stepper;
 use crate::ui::theme::{
   ACCENT_PRIMARY, ACCENT_SUBTLE, BACKGROUND_CARD, BACKGROUND_ELEVATED, BACKGROUND_SUBTLE,
-  BORDER_DEFAULT, DANGER_RED, DANGER_SUBTLE, FONT_MEDIUM, FONT_SEMIBOLD, TEXT_DISABLED,
-  TEXT_PRIMARY, TEXT_SECONDARY,
+  BORDER_DEFAULT, BORDER_SUBTLE, DANGER_RED, DANGER_SUBTLE, FONT_MEDIUM, FONT_SEMIBOLD,
+  TEXT_ACCENT, TEXT_DISABLED, TEXT_PRIMARY, TEXT_SECONDARY, WARNING_AMBER, WARNING_SUBTLE,
 };
 
 pub fn view(form: &ServiceFormState) -> Element<'_, Message> {
@@ -24,26 +24,6 @@ pub fn view(form: &ServiceFormState) -> Element<'_, Message> {
     3 => view_step3(form),
     _ => iced::widget::Space::new().into(),
   };
-
-  let next_label = if form.step == 3 {
-    if form.editing_id.is_some() {
-      "Enregistrer"
-    } else {
-      "Créer le service"
-    }
-  } else {
-    "Suivant →"
-  };
-
-  let next_enabled = match form.step {
-    1 => form.step1_valid(),
-    2 => true,
-    3 => true,
-    _ => false,
-  };
-
-  // Sur l'étape 3, Suivant soumet le formulaire
-  // Sur les autres, il avance d'une étape
 
   scrollable(
     column![
@@ -90,8 +70,49 @@ pub fn view(form: &ServiceFormState) -> Element<'_, Message> {
         };
         err_block
       },
+      // Confirmation d'annulation
+      {
+        let cancel_confirm: Element<Message> = if form.confirm_cancel {
+          container(
+            row![
+              text("⚠").size(12).color(WARNING_AMBER),
+              iced::widget::Space::new().width(8),
+              text("Modifications non enregistrées.")
+                .size(12)
+                .color(TEXT_PRIMARY),
+              iced::widget::Space::new().width(Length::Fill),
+              iced::widget::button(text("Quitter sans enregistrer").size(12).color(DANGER_RED))
+                .on_press(Message::CancelFormConfirmed)
+                .style(|_, _| iced::widget::button::Style {
+                  background: None,
+                  ..Default::default()
+                })
+                .padding([4, 8]),
+              iced::widget::Space::new().width(8),
+              iced::widget::button(text("Continuer l'édition").size(12).color(ACCENT_PRIMARY))
+                .on_press(Message::CancelFormAborted)
+                .style(|_, _| iced::widget::button::Style {
+                  background: None,
+                  ..Default::default()
+                })
+                .padding([4, 8]),
+            ]
+            .align_y(Alignment::Center),
+          )
+          .padding([10, 24])
+          .width(Length::Fill)
+          .style(|_: &iced::Theme| container::Style {
+            background: Some(Background::Color(WARNING_SUBTLE)),
+            ..Default::default()
+          })
+          .into()
+        } else {
+          iced::widget::Space::new().height(0).into()
+        };
+        cancel_confirm
+      },
       // Navigation
-      container(view_step_buttons(form.step, next_label, next_enabled))
+      container(view_step_buttons(form))
         .padding(iced::Padding {
           top: 16.0,
           right: 24.0,
@@ -134,8 +155,11 @@ fn view_step1(form: &ServiceFormState) -> Element<'_, Message> {
 fn view_step2(form: &ServiceFormState) -> Element<'_, Message> {
   let token_section: Element<Message> = if form.needs_api_token() {
     let token_ref = crate::app::mod_helpers::sanitize_token_ref_pub(&form.name);
+    let guide = token_guide(form);
     column![
       iced::widget::Space::new().height(12),
+      guide,
+      iced::widget::Space::new().height(10),
       field_label("Token d'accès personnel *", true),
       text_input("ghp_… ou glpat_…", &form.token_value)
         .on_input(|v| Message::FormFieldChanged(FormField::Token(v)))
@@ -165,7 +189,7 @@ fn view_step2(form: &ServiceFormState) -> Element<'_, Message> {
     return column![
       container(
         column![
-          text("ℹ  Paramètres fixes pour ce service :")
+          text("Paramètres fixes pour ce service :")
             .size(12)
             .color(TEXT_SECONDARY),
           iced::widget::Space::new().height(8),
@@ -190,6 +214,60 @@ fn view_step2(form: &ServiceFormState) -> Element<'_, Message> {
     .width(Length::Fill)
     .into();
   }
+
+  let is_external_cm = form.deploy_mode == DeployMode::ExternalCm;
+  let external_cm_toggle: Element<Message> = {
+    let checked = is_external_cm;
+    let (check_color, border_color, border_w) = if checked {
+      (ACCENT_PRIMARY, ACCENT_PRIMARY, 2.0_f32)
+    } else {
+      (TEXT_DISABLED, BORDER_DEFAULT, 1.0_f32)
+    };
+    let toggle_msg = if checked {
+      Message::FormFieldChanged(FormField::DeployMode(DeployMode::Automatic))
+    } else {
+      Message::FormFieldChanged(FormField::DeployMode(DeployMode::ExternalCm))
+    };
+    iced::widget::button(
+      row![
+        container(
+          text(if checked { "✓" } else { "" })
+            .size(11)
+            .color(check_color),
+        )
+        .width(18)
+        .height(18)
+        .align_x(iced::alignment::Horizontal::Center)
+        .align_y(iced::alignment::Vertical::Center)
+        .style(move |_: &iced::Theme| container::Style {
+          background: Some(Background::Color(BACKGROUND_ELEVATED)),
+          border: Border {
+            radius: 4.0.into(),
+            color: border_color,
+            width: border_w,
+          },
+          ..Default::default()
+        }),
+        iced::widget::Space::new().width(10),
+        column![
+          text("Déploiement géré par un outil externe")
+            .size(13)
+            .color(TEXT_PRIMARY),
+          text("NixOS, Ansible, Puppet… — SSHive affichera la clef publique à copier.")
+            .size(11)
+            .color(TEXT_SECONDARY),
+        ]
+        .spacing(2),
+      ]
+      .align_y(Alignment::Center),
+    )
+    .on_press(toggle_msg)
+    .style(|_, _| iced::widget::button::Style {
+      background: None,
+      ..Default::default()
+    })
+    .into()
+  };
 
   column![
     field_label("Hôte", false),
@@ -227,6 +305,15 @@ fn view_step2(form: &ServiceFormState) -> Element<'_, Message> {
       .spacing(2),
     ]
     .align_y(Alignment::End),
+    iced::widget::Space::new().height(12),
+    iced::widget::rule::horizontal(1).style(|_: &iced::Theme| iced::widget::rule::Style {
+      color: BORDER_SUBTLE,
+      radius: 0.0.into(),
+      fill_mode: iced::widget::rule::FillMode::Full,
+      snap: true,
+    }),
+    iced::widget::Space::new().height(8),
+    external_cm_toggle,
     token_section,
   ]
   .spacing(2)
@@ -289,21 +376,54 @@ fn view_step3(form: &ServiceFormState) -> Element<'_, Message> {
   .into()
 }
 
-fn view_step_buttons(
-  step: usize,
-  next_label: &'static str,
-  next_enabled: bool,
-) -> Element<'static, Message> {
-  let prev: Element<Message> = if step > 1 {
-    iced::widget::button(text("← Précédent").size(13).color(TEXT_SECONDARY))
-      .on_press(Message::FormStepPrev)
-      .style(|_, _| iced::widget::button::Style {
-        background: None,
-        ..Default::default()
-      })
-      .into()
+fn view_step_buttons(form: &ServiceFormState) -> Element<'_, Message> {
+  let step = form.step;
+
+  let next_label: &'static str = if step == 3 {
+    if form.editing_id.is_some() {
+      "Enregistrer"
+    } else {
+      "Créer le service"
+    }
   } else {
-    iced::widget::Space::new().width(Length::Fill).into()
+    "Suivant →"
+  };
+
+  let next_enabled = match step {
+    1 => form.step1_valid(),
+    2 | 3 => true,
+    _ => false,
+  };
+
+  let cancel_btn = iced::widget::button(text("Annuler").size(13).color(TEXT_SECONDARY))
+    .on_press(Message::CancelFormRequested)
+    .style(|_, status| iced::widget::button::Style {
+      background: Some(Background::Color(
+        if matches!(status, iced::widget::button::Status::Hovered) {
+          BACKGROUND_ELEVATED
+        } else {
+          iced::Color::TRANSPARENT
+        },
+      )),
+      ..Default::default()
+    })
+    .padding([8, 12]);
+
+  let left: Element<Message> = if step > 1 {
+    row![
+      cancel_btn,
+      iced::widget::Space::new().width(4),
+      iced::widget::button(text("← Précédent").size(13).color(TEXT_SECONDARY))
+        .on_press(Message::FormStepPrev)
+        .style(|_, _| iced::widget::button::Style {
+          background: None,
+          ..Default::default()
+        }),
+    ]
+    .align_y(Alignment::Center)
+    .into()
+  } else {
+    cancel_btn.into()
   };
 
   let next_bg = if next_enabled {
@@ -316,7 +436,6 @@ fn view_step_buttons(
   } else {
     TEXT_DISABLED
   };
-
   let next_msg = if step == 3 {
     Message::SubmitServiceForm
   } else {
@@ -338,7 +457,7 @@ fn view_step_buttons(
     next = next.on_press(next_msg);
   }
 
-  row![prev, iced::widget::Space::new().width(Length::Fill), next,]
+  row![left, iced::widget::Space::new().width(Length::Fill), next]
     .align_y(Alignment::Center)
     .width(Length::Fill)
     .into()
@@ -350,7 +469,6 @@ fn type_cards(selected: Option<&ServiceType>) -> Element<'static, Message> {
     (ServiceType::GitLab, "GL", "GitLab.com"),
     (ServiceType::GitLabSelfHosted, "GL*", "GitLab self-hosted"),
     (ServiceType::SshGeneric, "SSH", "SSH générique"),
-    (ServiceType::Manual, "M", "Manuel"),
   ];
 
   let cards: Vec<Element<Message>> = types
@@ -468,4 +586,95 @@ fn text_input_style(_theme: &iced::Theme, status: text_input::Status) -> text_in
     value: TEXT_PRIMARY,
     selection: ACCENT_SUBTLE,
   }
+}
+
+fn token_guide(form: &ServiceFormState) -> Element<'_, Message> {
+  let _ = HelpId::TokenGuideGitHub; // évite le warning unused
+
+  let (title, full_url, scope_line) = match &form.service_type {
+    Some(ServiceType::GitHub) => (
+      "Créer un token GitHub (Personal Access Token classique)",
+      "https://github.com/settings/tokens/new".to_string(),
+      "Scope requis : admin:public_key",
+    ),
+    Some(ServiceType::GitLab) => (
+      "Créer un token GitLab.com",
+      "https://gitlab.com/-/user_settings/personal_access_tokens".to_string(),
+      "Scope requis : api",
+    ),
+    Some(ServiceType::GitLabSelfHosted) => {
+      let base = form.host.trim_end_matches('/');
+      let url = if base.is_empty() {
+        "<votre-instance>/-/user_settings/personal_access_tokens".to_string()
+      } else if base.starts_with("http") {
+        format!("{base}/-/user_settings/personal_access_tokens")
+      } else {
+        format!("https://{base}/-/user_settings/personal_access_tokens")
+      };
+      (
+        "Créer un token GitLab (self-hosted)",
+        url,
+        "Scope requis : api",
+      )
+    }
+    _ => return iced::widget::Space::new().height(0).into(),
+  };
+
+  let url_clone = full_url.clone();
+
+  container(
+    column![
+      text(title).size(11).font(FONT_MEDIUM).color(TEXT_SECONDARY),
+      iced::widget::Space::new().height(6),
+      // URL cliquable + bouton copier
+      row![
+        iced::widget::button(
+          text("Ouvrir dans le navigateur")
+            .size(11)
+            .color(TEXT_ACCENT)
+        )
+        .on_press(Message::OpenUrl(full_url.clone()))
+        .style(|_, _| iced::widget::button::Style {
+          background: None,
+          ..Default::default()
+        })
+        .padding([0, 0]),
+        iced::widget::Space::new().width(12),
+        iced::widget::button(text("Copier l'URL").size(11).color(TEXT_SECONDARY))
+          .on_press(Message::CopyText(url_clone))
+          .style(|_, status| iced::widget::button::Style {
+            background: Some(Background::Color(
+              if matches!(status, iced::widget::button::Status::Hovered) {
+                BACKGROUND_ELEVATED
+              } else {
+                iced::Color::TRANSPARENT
+              },
+            )),
+            ..Default::default()
+          })
+          .padding([0, 4]),
+      ]
+      .align_y(Alignment::Center),
+      iced::widget::Space::new().height(4),
+      text("Durée de vie recommandée : 90 jours ou moins.")
+        .size(11)
+        .color(TEXT_SECONDARY),
+      text(scope_line).size(11).color(TEXT_SECONDARY),
+      text("Générez et copiez le token. Il ne sera plus affiché après.")
+        .size(11)
+        .color(TEXT_SECONDARY),
+    ]
+    .spacing(2),
+  )
+  .padding([10, 12])
+  .width(Length::Fill)
+  .style(|_: &iced::Theme| container::Style {
+    background: Some(Background::Color(ACCENT_SUBTLE)),
+    border: Border {
+      radius: 6.0.into(),
+      ..Default::default()
+    },
+    ..Default::default()
+  })
+  .into()
 }

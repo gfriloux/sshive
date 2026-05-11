@@ -71,7 +71,6 @@ pub fn service_type_badge(service_type: &ServiceType) -> Element<'static, Messag
     ServiceType::GitLab => (0.176, 0.106, 0.208, 0.988, 0.427, 0.149, "GL"),
     ServiceType::GitLabSelfHosted => (0.176, 0.106, 0.208, 0.988, 0.427, 0.149, "GL*"),
     ServiceType::SshGeneric => (0.051, 0.129, 0.216, 0.494, 0.722, 0.969, "SSH"),
-    ServiceType::Manual => (0.102, 0.165, 0.102, 0.529, 0.937, 0.671, "M"),
   };
   let bg = iced::Color::from_rgb(bg_r, bg_g, bg_b);
   let fg = iced::Color::from_rgb(fg_r, fg_g, fg_b);
@@ -141,7 +140,7 @@ mod tests {
     Service {
       id: Uuid::new_v4(),
       name: name.to_string(),
-      service_type: ServiceType::Manual,
+      service_type: ServiceType::SshGeneric,
       params: ServiceParams::default(),
       active_key: key_id,
       pending_key: None,

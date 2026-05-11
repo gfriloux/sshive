@@ -59,6 +59,13 @@ pub enum Message {
     service_id: Uuid,
     key_id: Uuid,
   },
+  SkPreFlightConfirmed,
+  PreflightCompleted(Result<(), AppError>),
+  DismissDeployBlocker,
+  OpenEditServiceAtStep {
+    service_id: Uuid,
+    step: usize,
+  },
   DeployModeSelected(DeployMode),
   DeployCompleted(Result<(), AppError>),
   VerifyCompleted(Result<bool, AppError>),
@@ -85,11 +92,27 @@ pub enum Message {
   RevokeCompleted(Result<(), AppError>),
   RevokeSaved(Result<Config, AppError>),
 
+  // ── Annulation du formulaire ───────────────────────────────────
+  CancelFormRequested,
+  CancelFormConfirmed,
+  CancelFormAborted,
+
+  // ── Clefs SK ───────────────────────────────────────────────────
+  DismissBackupPrompt(uuid::Uuid),
+  BackupPromptSaved(Result<crate::config::model::Config, crate::error::AppError>),
+
+  // ── Presse-papier / navigateur ─────────────────────────────────
+  CopyPublicKey(uuid::Uuid),
+  CopyFeedbackExpired,
+  CopyText(String),
+  OpenUrl(String),
+
   // ── UI ─────────────────────────────────────────────────────────
   #[allow(dead_code)]
   ToggleHelp(HelpId),
   FormStepNext,
   FormStepPrev,
+  KeyFilterChanged(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -124,4 +147,7 @@ pub enum HelpId {
   Gpg,
   Fingerprint,
   Rotation,
+  TokenGuideGitHub,
+  TokenGuideGitLab,
+  TokenGuideGitLabSelf,
 }

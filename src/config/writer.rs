@@ -106,7 +106,7 @@ mod tests {
     config.services.push(Service {
       id: Uuid::new_v4(),
       name: "Test".to_string(),
-      service_type: ServiceType::Manual,
+      service_type: ServiceType::SshGeneric,
       params: Default::default(),
       active_key: None,
       pending_key: None,

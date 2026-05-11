@@ -177,7 +177,7 @@ keys:
     config.services.push(crate::config::model::Service {
       id: Uuid::new_v4(),
       name: "Test".into(),
-      service_type: ServiceType::Manual,
+      service_type: ServiceType::SshGeneric,
       params: Default::default(),
       active_key: None,
       pending_key: None,
@@ -187,7 +187,7 @@ keys:
       deployments: vec![],
     });
 
-    let snap = HealthSnapshot::compute(&config, &[], &HashMap::new());
+    let snap = HealthSnapshot::compute(&config, &[], &HashMap::new(), None);
     assert_eq!(snap.services.len(), 1);
   }
 }

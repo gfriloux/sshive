@@ -108,6 +108,7 @@ pub async fn generate_key_with(
     private_path: Some(private_path),
     public_path: Some(public_path),
     service_id: Some(req.service_id),
+    backup_prompted: false,
   })
 }
 

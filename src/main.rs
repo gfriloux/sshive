@@ -1,12 +1,14 @@
 #![deny(unsafe_code)]
 
 mod app;
+mod audit;
 mod config;
 mod deployer;
 mod error;
 mod health;
 mod regression_v010;
 mod regression_v020;
+mod regression_v030r1;
 mod secrets;
 mod security;
 mod subprocess;

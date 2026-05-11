@@ -84,6 +84,8 @@ pub enum DeployMode {
   Automatic,
   #[serde(rename = "guided")]
   Guided,
+  #[serde(rename = "external-cm")]
+  ExternalCm,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -102,10 +104,9 @@ pub enum ServiceType {
   GitLab,
   #[serde(rename = "gitlab-self-hosted")]
   GitLabSelfHosted,
-  #[serde(rename = "ssh-generic")]
+  // alias "manual" assure la rétrocompatibilité des configs existantes
+  #[serde(rename = "ssh-generic", alias = "manual")]
   SshGeneric,
-  #[serde(rename = "manual")]
-  Manual,
 }
 
 impl std::fmt::Display for ServiceType {
@@ -115,7 +116,6 @@ impl std::fmt::Display for ServiceType {
       Self::GitLab => write!(f, "GitLab"),
       Self::GitLabSelfHosted => write!(f, "GitLab (self-hosted)"),
       Self::SshGeneric => write!(f, "SSH générique"),
-      Self::Manual => write!(f, "Manuel"),
     }
   }
 }
@@ -159,6 +159,9 @@ pub struct SshKey {
   /// UUID du service associé (None pour les clefs orphelines)
   #[serde(default)]
   pub service_id: Option<Uuid>,
+  /// L'utilisateur a été invité à sauvegarder le handle (sk-ed25519 uniquement)
+  #[serde(default)]
+  pub backup_prompted: bool,
 }
 
 #[cfg(test)]
@@ -313,7 +316,7 @@ keys: []
       ("gitlab", ServiceType::GitLab),
       ("gitlab-self-hosted", ServiceType::GitLabSelfHosted),
       ("ssh-generic", ServiceType::SshGeneric),
-      ("manual", ServiceType::Manual),
+      ("manual", ServiceType::SshGeneric), // alias de rétrocompatibilité
     ] {
       let parsed: ServiceType = serde_yaml::from_str(s).unwrap();
       assert_eq!(parsed, expected, "variante échouée : {s}");
@@ -434,5 +437,59 @@ keys: []
 "#;
     let config: Config = serde_yaml::from_str(yaml).unwrap();
     assert_eq!(config.services[0].deploy_mode, DeployMode::Automatic);
+  }
+
+  #[test]
+  fn deploy_mode_external_cm_deserialise() {
+    let yaml = r#"
+services:
+  - name: "NixOS"
+    service_type: manual
+    deploy_mode: external-cm
+    active_key: null
+    pending_key: null
+    created_at: "2026-01-01"
+    last_rotation: null
+keys: []
+"#;
+    let config: Config = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(config.services[0].deploy_mode, DeployMode::ExternalCm);
+  }
+
+  #[test]
+  fn deploy_mode_external_cm_round_trip() {
+    let yaml = r#"
+services:
+  - name: "NixOS"
+    service_type: manual
+    deploy_mode: external-cm
+    active_key: null
+    pending_key: null
+    created_at: "2026-01-01"
+    last_rotation: null
+keys: []
+"#;
+    let config: Config = serde_yaml::from_str(yaml).unwrap();
+    let serialised = serde_yaml::to_string(&config).unwrap();
+    let config2: Config = serde_yaml::from_str(&serialised).unwrap();
+    assert_eq!(config2.services[0].deploy_mode, DeployMode::ExternalCm);
+  }
+
+  #[test]
+  fn config_v030_sans_external_cm_charge_automatic_par_defaut() {
+    // Config v0.3.0 sans le champ deploy_mode → Automatic par défaut (rétrocompat)
+    let yaml = r#"
+services:
+  - name: "Prod"
+    service_type: ssh-generic
+    active_key: null
+    pending_key: null
+    created_at: "2026-01-01"
+    last_rotation: null
+keys: []
+"#;
+    let config: Config = serde_yaml::from_str(yaml).unwrap();
+    assert_eq!(config.services[0].deploy_mode, DeployMode::Automatic);
+    assert_ne!(config.services[0].deploy_mode, DeployMode::ExternalCm);
   }
 }
