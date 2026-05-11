@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.3.x   | ✅        |
-| 0.2.x   | ✅        |
+| 0.3.x (incl. r1) | ✅ |
+| 0.2.x   | ❌        |
 | 0.1.x   | ❌        |
 
 ## Reporting a Vulnerability
@@ -28,9 +28,16 @@ your machine. In v0.3.x it makes **outgoing connections only**, initiated
 explicitly by the user:
 
 - SSH connections to servers you configure (deployment, verification, revocation)
-- HTTPS connections to GitHub API (`api.github.com`) and GitLab API (`gitlab.com` or your self-hosted instance) for services of those types — only when you trigger a deploy/revoke/verify action
+- HTTPS connections to GitHub API (`api.github.com`) and GitLab API (`gitlab.com` or your self-hosted instance) for services of those types — only when you trigger a deploy/revoke/verify action, including a pre-flight `GET /user` probe before rotation starts
+- No connections are made for services using `DeployMode::ExternalCm`
 
 It transmits no data to third parties for telemetry or analytics.
+
+## Local Audit Log
+
+Destructive operations (key generation, revocation, service deletion) are
+appended to `~/.config/sshive/audit.log` (permissions 0600). This file is
+append-only and never transmitted. It is not rotated in v0.3.x.
 
 ## Known Advisories
 
