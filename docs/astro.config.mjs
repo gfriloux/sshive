@@ -53,5 +53,16 @@ export default defineConfig({
         },
       },
     }),
+    // Neutralise @astrojs/sitemap (bug avec base path dans Starlight 0.20)
+    {
+      name: 'disable-sitemap',
+      hooks: {
+        'astro:config:setup': ({ config }) => {
+          config.integrations = config.integrations.filter(
+            (i) => i.name !== '@astrojs/sitemap'
+          );
+        },
+      },
+    },
   ],
 });
