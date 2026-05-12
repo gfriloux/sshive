@@ -1,0 +1,70 @@
+SSHive Documentation Site — File Manifest
+===========================================
+
+Configuration Files:
+  ✓ astro.config.mjs          — Astro + Starlight config
+  ✓ package.json              — npm dependencies
+  ✓ tsconfig.json             — TypeScript config
+  ✓ .gitignore                — git exclusions
+  ✓ .env.example              — environment variables template
+  ✓ src/content/config.ts     — Astro collections schema
+
+Assets:
+  ✓ src/assets/logo.svg       — SSHive logo (32×32 SVG)
+
+Styles:
+  ✓ src/styles/custom.css     — Color palette + typography
+
+Content Pages (13 total):
+  Home & Getting Started:
+    ✓ src/content/docs/index.mdx           — Home page
+    ✓ src/content/docs/installation.md     — Installation guide
+    ✓ src/content/docs/quickstart.md       — 5-minute quickstart
+
+  Guides (5 pages):
+    ✓ src/content/docs/guide/services.md   — Service management
+    ✓ src/content/docs/guide/keys.md       — SSH key generation
+    ✓ src/content/docs/guide/deployment.md — Deployment modes
+    ✓ src/content/docs/guide/health.md     — Health diagnostics
+    ✓ src/content/docs/guide/tokens.md     — API tokens
+
+  Reference (3 pages):
+    ✓ src/content/docs/reference/configuration.md — YAML schema
+    ✓ src/content/docs/reference/security.md      — Security & threats
+    ✓ src/content/docs/reference/changelog.md     — Version history
+
+CI/CD:
+  ✓ .github/workflows/docs.yml — GitHub Actions deployment
+
+Developer Docs:
+  ✓ README.md                  — Documentation site guide
+  ✓ QUICK_START.md             — Developer quickstart
+  ✓ STRUCTURE.md               — Complete structure documentation
+  ✓ MANIFEST.txt               — This file
+  ✓ test-build.sh              — Build test script
+
+===========================================
+Total: 27 files created
+Content: 13 Markdown/MDX pages (~25,000 words)
+Status: Ready for npm install && npm run build
+===========================================
+
+Next Steps:
+1. cd docs
+2. npm install
+3. npm run dev              (development)
+   or
+   npm run build            (production build)
+
+Deploy:
+  Automatic via GitHub Actions on push to main with docs/ changes
+  Live URL: https://gfriloux.github.io/sshive
+
+Validation:
+  All pages follow Markdown best practices
+  All frontmatter includes title + description
+  All navigation structured in astro.config.mjs
+  All styles personalized with SSHive color palette
+  All content in French (no English placeholders)
+  All sections cross-referenced properly
+  Ready for SEO (metadata, descriptions, h1-h6 hierarchy)

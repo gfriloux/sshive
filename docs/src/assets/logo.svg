@@ -1,0 +1,16 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+  <!-- Key shaft -->
+  <rect x="4" y="12" width="16" height="4" rx="2" fill="#4A80D4"/>
+
+  <!-- Key head (circle) -->
+  <circle cx="8" cy="14" r="5" fill="#4A80D4"/>
+
+  <!-- Key teeth (right side) -->
+  <rect x="20" y="13" width="2" height="2" fill="#4A80D4"/>
+  <rect x="20" y="17" width="2" height="2" fill="#4A80D4"/>
+
+  <!-- Security indicator dots -->
+  <circle cx="26" cy="10" r="1.5" fill="#4A80D4" opacity="0.7"/>
+  <circle cx="27.5" cy="18" r="1.5" fill="#4A80D4" opacity="0.7"/>
+  <circle cx="25" cy="24" r="1.5" fill="#4A80D4" opacity="0.7"/>
+</svg>

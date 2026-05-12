@@ -1,0 +1,26 @@
+:root {
+  --sl-color-accent-low: #1B2535;
+  --sl-color-accent: #4A80D4;
+  --sl-color-accent-high: #E2E8F4;
+  --sl-color-white: #E2E8F4;
+  --sl-color-gray-1: #8FA3C0;
+  --sl-font-system-mono: 'JetBrains Mono', monospace;
+}
+
+/* Code block typography */
+code {
+  font-family: var(--sl-font-system-mono);
+  font-size: 0.95em;
+}
+
+pre {
+  font-family: var(--sl-font-system-mono);
+}
+
+/* Improved readability for inline code */
+:not(pre) > code {
+  background: var(--sl-color-accent-low);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  color: var(--sl-color-accent-high);
+}
