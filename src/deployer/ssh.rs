@@ -13,6 +13,12 @@ pub struct SshCopyIdDeployer {
   runner: Arc<dyn CommandRunner>,
 }
 
+impl Default for SshCopyIdDeployer {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl SshCopyIdDeployer {
   pub fn new() -> Self {
     Self {
@@ -97,12 +103,10 @@ impl KeyDeployer for SshCopyIdDeployer {
 
 #[cfg(test)]
 mod tests {
-  use std::path::Path;
   use std::sync::Arc;
 
   use super::*;
   use crate::subprocess::fake::FakeRunner;
-  use crate::subprocess::ProcessOutput;
 
   fn make_ctx(host: &str, user: &str) -> DeployContext {
     DeployContext {

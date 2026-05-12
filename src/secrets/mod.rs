@@ -21,6 +21,9 @@ pub async fn load_or_create(gpg_fingerprint: String, path: PathBuf) -> Result<Se
 
 /// Déchiffre et charge les secrets, ou crée un fichier vide chiffré.
 pub async fn load_or_create_ref(gpg_fingerprint: &str, path: &Path) -> Result<Secrets, AppError> {
+  if path.exists() {
+    crate::config::loader::warn_permissions(path);
+  }
   if !path.exists() {
     let empty = Secrets::default();
     save_ref(&empty, gpg_fingerprint, path).await?;

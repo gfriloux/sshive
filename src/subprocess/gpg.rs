@@ -131,6 +131,51 @@ pub async fn decrypt_with(
   Ok(out.stdout.into_bytes())
 }
 
+/// Crée une nouvelle clef GPG Ed25519/Cv25519 non expirante via gpg --batch.
+/// Retourne l'empreinte de la clef créée.
+pub async fn create_key() -> Result<String, AppError> {
+  let batch = "Key-Type: EDDSA\n\
+               Key-Curve: Ed25519\n\
+               Subkey-Type: ECDH\n\
+               Subkey-Curve: Curve25519\n\
+               Name-Real: SSHive\n\
+               Name-Email: sshive@localhost\n\
+               Expire-Date: 0\n\
+               %no-protection\n\
+               %commit\n";
+
+  // Écrire le batch dans un fichier temporaire
+  let tmp_path = std::env::temp_dir().join("sshive_gpg_batch.txt");
+  std::fs::write(&tmp_path, batch).map_err(|e| AppError::Io {
+    path: tmp_path.clone(),
+    message: e.to_string(),
+  })?;
+  let tmp_path_str = tmp_path.to_str().unwrap_or("").to_string();
+  let runner = RealRunner;
+  let out = runner
+    .run("gpg", &["--batch", "--gen-key", &tmp_path_str], 60)
+    .await?;
+  let _ = std::fs::remove_file(&tmp_path);
+
+  if out.exit_code != 0 {
+    return Err(AppError::GpgFailed {
+      operation: "create-key".to_string(),
+      stderr: out.stderr.clone(),
+    });
+  }
+
+  // Relire la liste pour récupérer l'empreinte de la clef fraîchement créée
+  let keys = list_secret_keys().await?;
+  keys
+    .into_iter()
+    .find(|k| k.uid.contains("sshive@localhost"))
+    .map(|k| k.fingerprint)
+    .ok_or_else(|| AppError::GpgFailed {
+      operation: "create-key".to_string(),
+      stderr: "Clef créée mais non trouvée dans le keyring".to_string(),
+    })
+}
+
 fn classify_gpg_error(operation: &str, stderr: &str) -> AppError {
   if stderr.contains("No secret key") {
     AppError::GpgNoSecretKey

@@ -1,0 +1,38 @@
+{
+  "productName": "SSHive",
+  "version": "0.4.0",
+  "identifier": "me.friloux.sshive",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1421",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: https://asset.localhost; script-src 'self'; connect-src ipc: http://ipc.localhost https://fonts.googleapis.com https://fonts.gstatic.com"
+    },
+    "windows": [
+      {
+        "title": "SSHive",
+        "width": 1200,
+        "height": 760,
+        "minWidth": 800,
+        "minHeight": 540,
+        "resizable": true,
+        "decorations": true
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "icon": ["icons/icon.png"],
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]
+      }
+    }
+  }
+}

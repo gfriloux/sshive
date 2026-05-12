@@ -84,7 +84,7 @@ pub async fn load_from_path(path: &Path) -> Result<Config, AppError> {
 }
 
 #[cfg(unix)]
-fn warn_permissions(path: &Path) {
+pub fn warn_permissions(path: &Path) {
   use std::os::unix::fs::PermissionsExt;
   if let Ok(meta) = std::fs::metadata(path) {
     let mode = meta.permissions().mode() & 0o777;
@@ -97,6 +97,9 @@ fn warn_permissions(path: &Path) {
     }
   }
 }
+
+#[cfg(not(unix))]
+pub fn warn_permissions(_path: &Path) {}
 
 #[cfg(unix)]
 fn set_permissions_file(path: &Path) {

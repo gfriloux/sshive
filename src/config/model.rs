@@ -14,6 +14,8 @@ pub struct Config {
   pub gpg: GpgConfig,
   #[serde(default)]
   pub health: HealthConfig,
+  #[serde(default)]
+  pub security: SecurityConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +45,30 @@ pub struct GpgConfig {
   pub key_fingerprint: Option<String>,
   /// Chemin vers secrets.yaml.gpg (défaut : ~/.config/sshive/secrets.yaml.gpg)
   pub secrets_path: Option<PathBuf>,
+  /// Override du backend pinentry (None = auto depuis XDG_CURRENT_DESKTOP)
+  #[serde(default)]
+  pub pinentry_backend: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityConfig {
+  /// Longueur minimale de la phrase secrète SSH (défaut : 12)
+  #[serde(default = "SecurityConfig::default_min_passphrase_len")]
+  pub min_passphrase_len: u8,
+}
+
+impl SecurityConfig {
+  fn default_min_passphrase_len() -> u8 {
+    12
+  }
+}
+
+impl Default for SecurityConfig {
+  fn default() -> Self {
+    Self {
+      min_passphrase_len: Self::default_min_passphrase_len(),
+    }
+  }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

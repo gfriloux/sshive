@@ -21,33 +21,54 @@ mkShell {
     cargo-deny
     cargo-about
 
+    # Tauri CLI + Node (app + docs)
+    cargo-tauri
+    nodejs_22
+
+    # Build tooling
+    pkg-config
+
     # Outils dev
     git-cliff
     just
-
-    # iced (wayland + x11)
-    wayland
-    libxkbcommon
-    libGL
-    vulkan-loader
-
-    # rfd (native file dialog — v0.2+)
-    gtk3
 
     # ssh-keygen (validation fingerprints en dev)
     openssh
   ];
 
-  shellHook = ''
-        export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [
-      pkgs.wayland
-      pkgs.libxkbcommon
-      pkgs.libGL
-      pkgs.vulkan-loader
-      pkgs.dbus
-    ]}:$LD_LIBRARY_PATH
+  # Tauri v2 — stack GTK/WebKit requise sur Linux
+  buildInputs = with pkgs; [
+    dbus
+    openssl
+    glib
+    glib-networking
+    gtk3
+    webkitgtk_4_1
+    libsoup_3
+    cairo
+    pango
+    gdk-pixbuf
+    atk
+    librsvg
+    xdotool
+  ];
 
-        echo "[sshive] Ready."
+  shellHook = ''
+        export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath (with pkgs; [
+      dbus
+      openssl
+      glib
+      gtk3
+      webkitgtk_4_1
+      libsoup_3
+      cairo
+      pango
+      gdk-pixbuf
+      atk
+      librsvg
+    ])}:$LD_LIBRARY_PATH
+
+        echo "[sshive] Ready. Run: cd tauri-app && cargo-tauri dev"
 
         if [ ! -f .pre-commit-config.yaml ]; then
           echo "Generating .pre-commit-config.yaml..."
@@ -67,7 +88,7 @@ mkShell {
             language: system
             entry: deadnix --fail
             files: \.nix$
-            pass_filenames: true
+            pass_filenames: false
           - id: statix
             name: statix
             language: system
