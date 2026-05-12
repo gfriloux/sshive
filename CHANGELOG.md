@@ -6,6 +6,45 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-11
+
+### Breaking change
+
+- **Migration Iced → Tauri** — le frontend passe de Rust/Iced à Tauri v2 + Svelte 5. Le binaire s'appelle désormais `sshive-app` (dans `tauri-app/src-tauri/target/release/`). La config `~/.config/sshive/config.yaml` et les secrets restent inchangés.
+
+### Added
+
+- **Nouvelle interface Tauri + Svelte 5** — layout 3 colonnes (sidebar 200px | liste flex | détail 340px), DM Sans + JetBrains Mono, palette WCAG dark theme, CSS transitions et backdrop-filter, animations `pulse-critical` CSS pur
+- **Scan automatique `~/.ssh/*.pub`** — les clefs découvertes hors config sont visibles dans la page Clefs ; déduplication par fingerprint
+- **Tokens API** — commandes `set_token` / `delete_token` / `list_token_refs` ; tokens chiffrés dans `secrets.yaml.gpg` ; champ token intégré au stepper "Nouveau service" (étape 2) ; avertissement en temps réel si token manquant
+- **Déploiement avec vrais tokens** — `deploy_key` et `revoke_key` chargent maintenant les secrets GPG décryptés ; `NoApiToken` correctement émis dans le health snapshot
+- **Page Services** — liste tabulaire 2 lignes (nom + hostname mono), dot de statut pulsant pour critical, panneau de détail avec health banner coloré, fingerprint amber, copie clef publique via clipboard API native
+- **Page Clefs** — grid de cartes avec type, protection, YubiKey badge, service associé ; bouton "Changer la passphrase"
+- **Page Santé** — 3 tuiles compteurs (ok/warning/critical), liste priorisée des services avec raisons détaillées
+- **Page Paramètres** — seuil de rotation (slider), longueur minimale passphrase, section GPG, section Tokens API (liste + ajout + suppression)
+- **Modaux** — AddService (stepper 3 étapes), KeyGen (type + force passphrase), Deploy (3 modes : auto/guidé/CM externe avec snippet NixOS + Ansible), GpgSetup, PassphraseModal
+- **Capabilities Tauri minimales** — `clipboard-manager:allow-write-text` uniquement ; pas d'accès FS direct depuis le JS
+- **CSP stricte** — `default-src 'self'` dans `tauri.conf.json`
+- **Validateurs IPC** — longueur et charset validés sur tous les champs texte (`name`, `url`, `user`, `token_ref`, `token_value`, `gpg_fingerprint`)
+- **Documentation Astro + Starlight** — 13 pages en français, déployable sur GitHub Pages via GitHub Actions (`.github/workflows/docs.yml`) ; commandes `just docs-dev` / `just docs-build`
+- **Screenshots automatiques** — `just screenshots` génère les 5 captures de la doc via Playwright + mode mock Vite (sans Tauri)
+
+### Changed
+
+- `Cargo.toml` racine : dépendance `iced` supprimée ; la lib core (`src/`) est désormais sans UI, utilisée comme crate par `tauri-app/src-tauri/`
+- `shells/default/default.nix` : stack Wayland/Iced remplacée par WebKit/GTK/Tauri + `cargo-tauri` + `nodejs_22`
+- `Justfile` : `just dev` → `cargo-tauri dev` ; `just build` → `.deb` ; `just build-bin` → ELF nu ; `just run` → lance le binaire compilé
+
+### Removed
+
+- `src/app/` et `src/ui/` — code Iced supprimé
+- `src/main.rs` — binaire Iced supprimé
+- `tauri-demo/` — démo proof-of-concept remplacée par `tauri-app/`
+
+### Compatibility
+
+Config `~/.config/sshive/config.yaml` et `secrets.yaml.gpg` : aucun changement de format, migration transparente depuis v0.3.0.
+
 ## [0.3.0] - 2026-05-11
 
 ### Added
