@@ -2,3 +2,9 @@
 .direnv
 .envrc
 .pre-commit-config.yaml
+node_modules/
+/package-lock.json
+/docs/node_modules/
+/docs/dist/
+/tmp/
+*.log
