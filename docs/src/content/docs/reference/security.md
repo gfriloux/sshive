@@ -1,117 +1,117 @@
 ---
-title: Sécurité
-description: Philosophie de sécurité, menaces, et mesures de protection.
+title: Security
+description: Security philosophy, threats, and protection measures.
 ---
 
-SSHive est conçu avec **sécurité en première priorité**. Cette page explique la philosophie, les menaces identifiées et les mesures de protection implémentées.
+SSHive is designed with **security as first priority**. This page explains the philosophy, identified threats, and implemented protection measures.
 
-## Principes de sécurité
+## Security Principles
 
-### Moindre privilège
+### Least Privilege
 
-Chaque clef SSH est dédiée à un seul service. Aucune clef n'est partagée entre plusieurs services ou utilisateurs.
+Each SSH key is dedicated to a single service. No key is shared between multiple services or users.
 
-**Bénéfice :** si une clef est compromise, seul ce service est exposé.
+**Benefit:** if a key is compromised, only that service is exposed.
 
-### Secrets chiffrés
+### Encrypted Secrets
 
-Les tokens API et passphrases ne sont **jamais stockés en clair**.
+API tokens and passphrases are **never stored in plain text**.
 
-- **Tokens API** → chiffrés avec GPG dans `secrets.yaml.gpg`
-- **Passphrases** → déchiffrées uniquement quand nécessaires, jamais stockées
+- **API tokens** → encrypted with GPG in `secrets.yaml.gpg`
+- **Passphrases** → decrypted only when needed, never stored
 
-### Processus durci
+### Hardened Process
 
-Au démarrage, SSHive applique des mesures de durcissement du processus Linux :
+At startup, SSHive applies Linux process hardening measures:
 
-- `PR_SET_DUMPABLE = 0` — désactive les core dumps (ne peuvent pas être exploités pour extraire les secrets)
-- `PR_SET_PTRACER = -1` — bloque les attachements ptrace (debuggers, strace)
+- `PR_SET_DUMPABLE = 0` — disables core dumps (cannot be exploited to extract secrets)
+- `PR_SET_PTRACER = -1` — blocks ptrace attachments (debuggers, strace)
 
-### Cryptographie moderne
+### Modern Cryptography
 
-- **Algoritmes** : Ed25519 (signatures), Curve25519 (chiffrement), AES-256-CTR (re-encryption de clefs)
-- **Chiffrement** : bcrypt-pbkdf pour dérivation de clef de passphrase
-- **RNG** : `/dev/urandom` (système), pas de RNG custom
+- **Algorithms**: Ed25519 (signatures), Curve25519 (encryption), AES-256-CTR (key re-encryption)
+- **Encryption**: bcrypt-pbkdf for passphrase key derivation
+- **RNG**: `/dev/urandom` (system), no custom RNG
 
-## Menaces et mitigations
+## Threats and Mitigations
 
-### T1 : Vol de passphrase pendant la saisie
+### T1: Passphrase Theft During Entry
 
-**Menace** : un attaquant capture la passphrase en lisant `/proc/<pid>/cmdline`.
+**Threat**: an attacker captures the passphrase by reading `/proc/<pid>/cmdline`.
 
-**Atténuation v0.2.0** : passphrases saisies via `pinentry` (interface graphique isolée), pas directement passées à `ssh-keygen`.
+**Mitigation v0.2.0**: passphrases entered via `pinentry` (isolated GUI), not directly passed to `ssh-keygen`.
 
-**Atténuation v0.3.0** : passphrases déchiffrées uniquement à l'intérieur de SSHive, jamais passées en argument à un processus. Re-encryption pure Rust via la crate `ssh-key` + bcrypt-pbkdf.
+**Mitigation v0.3.0**: passphrases decrypted only inside SSHive, never passed as process argument. Pure Rust re-encryption via `ssh-key` crate + bcrypt-pbkdf.
 
-**Résidu** : si un attaquant a accès root ou débogage du processus, la passphrase peut être lue en mémoire. **Mitigation** : `mlock` sur les buffers de passphrase pour épingler en RAM physique.
+**Residual**: if an attacker has root or process debugging access, passphrase can be read from memory. **Mitigation**: `mlock` on passphrase buffers to pin in physical RAM.
 
-### T2 : Clefs privées non protégées
+### T2: Unprotected Private Keys
 
-**Menace** : une clef SSH sans passphrase peut être utilisée immédiatement si quelqu'un accède à `~/.ssh/`.
+**Threat**: an SSH key without passphrase can be used immediately if someone accesses `~/.ssh/`.
 
-**Atténuation** :
-- Génération : **passphrase obligatoire** (≥ 12 caractères, policy NIST conforme)
-- Détection : SSHive scanne `~/.ssh/` au démarrage et alerte si une clef n'a pas de passphrase
-- Protection rétrospective : **"Ajouter une passphrase"** pour les clefs existantes sans protection
+**Mitigation**:
+- Generation: **passphrase mandatory** (≥ 12 characters, NIST compliant policy)
+- Detection: SSHive scans `~/.ssh/` at startup and alerts if a key has no passphrase
+- Retroactive protection: **"Add a passphrase"** for existing unprotected keys
 
-**Résidu** : un utilisateur peut toujours forcer la génération sans passphrase via `ssh-keygen` directement. **Mitigation** : audit local de toutes les actions SSHive.
+**Residual**: a user can always force generation without passphrase via `ssh-keygen` directly. **Mitigation**: local audit of all SSHive actions.
 
-### T3 : Compromise d'une clef via accès disque
+### T3: Key Compromise via Disk Access
 
-**Menace** : un attaquant copie le fichier clef privée de `~/.ssh/` (même sans passphrase, il peut forcer la passphrase hors ligne).
+**Threat**: an attacker copies the private key file from `~/.ssh/` (even without passphrase, they can force the passphrase offline).
 
-**Atténuation** :
-- Permissions fichiers : `0600` (utilisateur seulement, lisible par le propriétaire)
-- Chiffrement optionnel : passphrase SSH (`ssh-keygen -N`)
-- Hardware keys : SK-Ed25519 (clef privée jamais sur disque, seulement sur YubiKey)
+**Mitigation**:
+- File permissions: `0600` (user only, readable by owner)
+- Optional encryption: SSH passphrase (`ssh-keygen -N`)
+- Hardware keys: SK-Ed25519 (private key never on disk, only on YubiKey)
 
-**Résidu** : si l'attaquant a accès au disque/VM, il peut extraire les clefs passphrasées via GPU cracking hors ligne. **Mitigation** : passphrase forte (16+ caractères) + rotation régulière (90 jours) = fenêtre de temps limitée.
+**Residual**: if attacker has disk/VM access, they can extract passphrased keys via GPU cracking offline. **Mitigation**: strong passphrase (16+ characters) + regular rotation (90 days) = limited time window.
 
-### T4 : Tokens API exposés
+### T4: Exposed API Tokens
 
-**Menace** : un token GitHub/GitLab permet d'ajouter/supprimer des clefs SSH sans limite. S'il est exposé, un attaquant peut accéder à tous les services.
+**Threat**: a GitHub/GitLab token allows adding/removing SSH keys without limit. If exposed, an attacker can access all services.
 
-**Atténuation** :
-- **Chiffrement GPG** — tokens stockés dans `secrets.yaml.gpg`, qui est chiffré avec votre clef GPG
-- **Jamais en logs** — tokens n'apparaissent jamais dans `audit.log`, les messages d'erreur, ou la config
-- **Déchiffrement à la demande** — tokens n'existent en mémoire déchiffrée que pendant l'appel API, puis sont oubliés
-- **Scopes minimaux** — GitHub : `admin:public_key` seulement (pas de `repo`, `delete_repo`, etc.) ; GitLab : `api` (minimal pour `/user/keys`)
+**Mitigation**:
+- **GPG encryption** — tokens stored in `secrets.yaml.gpg`, encrypted with your GPG key
+- **Never in logs** — tokens never appear in `audit.log`, error messages, or config
+- **On-demand decryption** — tokens exist in memory decrypted only during API call, then forgotten
+- **Minimal scopes** — GitHub: `admin:public_key` only (no `repo`, `delete_repo`, etc.); GitLab: `api` (minimal for `/user/keys`)
 
-**Résidu** : si GPG est compromis (attaquant a votre passphrase GPG), tous les tokens sont exposés. **Mitigation** : passphrase GPG forte + processus durci bloque les attachements debugger.
+**Residual**: if GPG is compromised (attacker has your GPG passphrase), all tokens are exposed. **Mitigation**: strong GPG passphrase + hardened process blocks debugger attachments.
 
-### T5 : Compromise du service intermédiaire (GitHub/GitLab)
+### T5: Compromise of Intermediate Service (GitHub/GitLab)
 
-**Menace** : un attaquant compromet GitHub ou GitLab et ajoute des clefs publiques à votre compte.
+**Threat**: an attacker compromises GitHub or GitLab and adds public keys to your account.
 
-**Atténuation** :
-- **Vérification post-déploiement** — après déployer une clef, SSHive appelle l'API pour confirmer que sa clef (et seulement sa clef) est listée
-- **Audit local** — `audit.log` enregistre tous les déploiements avec fingerprint et timestamp
-- **Clefs distinctes par service** — si GitHub est compromis, seul votre accès GitHub est exposé (pas vos autres services)
+**Mitigation**:
+- **Post-deployment verification** — after deploying a key, SSHive calls the API to confirm only its key is listed
+- **Local audit** — `audit.log` records all deployments with fingerprint and timestamp
+- **Distinct keys per service** — if GitHub is compromised, only your GitHub access is exposed (not your other services)
 
-**Résidu** : si GitHub est compromis longtemps avant la détection, l'attaquant peut créer des clefs SSH. **Mitigation** : audit régulier (vérification hebdomadaire de la liste de clefs publiques sur GitHub).
+**Residual**: if GitHub is compromised long before detection, attacker can create SSH keys. **Mitigation**: regular audit (weekly verification of public key list on GitHub).
 
-### T6 : Perte de YubiKey avec SK-Ed25519
+### T6: Loss of YubiKey with SK-Ed25519
 
-**Menace** : la clef privée d'une SK-Ed25519 est stockée physiquement sur le YubiKey. Si le YubiKey est perdu/volé, la clef est inaccessible.
+**Threat**: the private key of an SK-Ed25519 is stored physically on the YubiKey. If the YubiKey is lost/stolen, the key is inaccessible.
 
-**Atténuation** :
-- **Backup du fichier `.pub`** — après génération, SSHive alerte pour sauvegarder le fichier clef publique (nécessaire pour la révocation)
-- **Avertissement avant rotation** — avant de renouveler une SK, SSHive alerte : "YubiKey doit rester branchée"
-- **Vérification obligatoire** — toute rotation de SK doit passer la vérification post-déploiement (sécurité supplémentaire)
+**Mitigation**:
+- **`.pub` file backup** — after generation, SSHive alerts to back up the public key file (necessary for revocation)
+- **Pre-rotation warning** — before renewing an SK, SSHive warns: "YubiKey must stay connected"
+- **Mandatory verification** — any SK rotation must pass post-deployment verification (extra security)
 
-**Résidu** : si le YubiKey est perdu et que vous n'avez pas la sauvegarde, vous ne pouvez pas révoquer la clef à distance. **Mitigation** : sauvegardez le `.pub` immédiatement après génération.
+**Residual**: if YubiKey is lost and you don't have the backup, you can't revoke the key remotely. **Mitigation**: back up the `.pub` immediately after generation.
 
-## Protections impliquées
+## Implemented Protections
 
-### Chiffrement des secrets
+### Secrets Encryption
 
-**Fichier** : `~/.config/sshive/secrets.yaml.gpg`
+**File**: `~/.config/sshive/secrets.yaml.gpg`
 
-- Chiffré avec **GPG** + votre clef GPG privée
-- Nécessite votre **passphrase GPG** pour déchiffrer
-- Contenus : tokens API GitHub/GitLab
+- Encrypted with **GPG** + your private GPG key
+- Requires your **GPG passphrase** to decrypt
+- Contents: GitHub/GitLab API tokens
 
-**Format déchiffré (ne jamais toucher) :**
+**Decrypted format (never touch):**
 
 ```yaml
 tokens:
@@ -121,30 +121,30 @@ tokens:
     api_token: "glpat-xxxxx..."
 ```
 
-### Permissions fichiers
+### File Permissions
 
-| Fichier | Permission | Propriétaire | Justification |
-|---------|-----------|--------------|---------------|
-| `config.yaml` | `0600` | utilisateur | Lisible par propriétaire seulement |
-| `secrets.yaml.gpg` | `0600` | utilisateur | Secrets chiffrés, mais lisible seul par proprio |
-| `audit.log` | `0600` | utilisateur | Audit local, sensible |
-| `~/.ssh/` | `0700` | utilisateur | Standard SSH |
-| `~/.ssh/id_*` | `0600` | utilisateur | Clef privée standard |
-| `~/.ssh/id_*.pub` | `0644` | utilisateur | Clef publique, peut être lue par tous |
+| File | Permission | Owner | Justification |
+|------|-----------|-------|---------------|
+| `config.yaml` | `0600` | user | Readable by owner only |
+| `secrets.yaml.gpg` | `0600` | user | Encrypted, but readable by owner only |
+| `audit.log` | `0600` | user | Local audit, sensitive |
+| `~/.ssh/` | `0700` | user | Standard SSH |
+| `~/.ssh/id_*` | `0600` | user | Standard private key |
+| `~/.ssh/id_*.pub` | `0644` | user | Public key, readable by all |
 
-SSHive vérifie les permissions au démarrage et alerte si elles sont trop permissives.
+SSHive checks permissions at startup and alerts if too permissive.
 
-### Passphrase GPG
+### GPG Passphrase
 
-La sécurité de tous les secrets dépend de votre **passphrase GPG**.
+The security of all secrets depends on your **GPG passphrase**.
 
-- Choisissez une passphrase forte (16+ caractères)
-- Ne la réutilisez pas sur d'autres services
-- Stockez-la en lieu sûr (gestionnaire de mots de passe, papier chiffré, etc.)
+- Choose a strong passphrase (16+ characters)
+- Don't reuse it on other services
+- Store it safely (password manager, encrypted paper, etc.)
 
-### Audit local
+### Local Audit
 
-Tous les actions sont enregistrées dans `~/.config/sshive/audit.log` (append-only, `0600`) :
+All actions are recorded in `~/.config/sshive/audit.log` (append-only, `0600`):
 
 ```
 2026-05-11T14:35:22Z [sshive] Generated SSH key ed25519 for service GitHub
@@ -152,77 +152,77 @@ Tous les actions sont enregistrées dans `~/.config/sshive/audit.log` (append-on
 2026-05-11T16:20:10Z [sshive] Rotated key for service Production
 ```
 
-Consultez ce journal pour :
-- Détecter les accès non autorisés
-- Tracer les rotations et révocations
-- Auditer la conformité
+Check this log to:
+- Detect unauthorized access
+- Trace rotations and revocations
+- Audit compliance
 
-### Algorithmes cryptographiques
+### Cryptographic Algorithms
 
-| Usage | Algorithme | Détails |
+| Usage | Algorithm | Details |
 |-------|-----------|---------|
-| Génération de clefs | Ed25519 | Crypto25519, 256 bits, résistant au quantum |
-| Dérivation de passphrase | bcrypt-pbkdf | 16 rounds, SHA512, salé |
-| Re-encryption de clefs | AES-256-CTR | 256 bits, mode CTR |
-| Chiffrement GPG | GnuPG (RSA/DSA/ECDSA) | Dépend de votre clef (configurable) |
-| Signatures HTTP | TLS 1.2+ / RUSTLS | Pas de OpenSSL, WebPKI roots |
+| Key generation | Ed25519 | Curve25519, 256 bits, quantum-resistant |
+| Passphrase derivation | bcrypt-pbkdf | 16 rounds, SHA512, salted |
+| Key re-encryption | AES-256-CTR | 256 bits, CTR mode |
+| GPG encryption | GnuPG (RSA/DSA/ECDSA) | Depends on your key (configurable) |
+| HTTP signatures | TLS 1.2+ / RUSTLS | No OpenSSL, WebPKI roots |
 
-## Bonnes pratiques opérationnelles
+## Operational Best Practices
 
-### Passphrases SSH fortes
+### Strong SSH Passphrases
 
-- **Minimum** : 12 caractères (configurable, défaut conforme NIST)
-- **Recommandé** : 16+ caractères, mélange d'alphanumériques + symboles
-- **Exemple** : `"MyGitHub_Prod@2026!Key"`
+- **Minimum**: 12 characters (configurable, default complies with NIST)
+- **Recommended**: 16+ characters, mix of alphanumeric + symbols
+- **Example**: `"MyGitHub_Prod@2026!Key"`
 
-### Rotation régulière
+### Regular Rotation
 
-- **Défaut** : alerte après 90 jours sans rotation
-- **Recommandé** : renouveler tous les 60-90 jours pour la production
-- **Procédure** : SSHive gère la rotation atomiquement (génère, déploie, archive ancien)
+- **Default**: alert after 90 days without rotation
+- **Recommended**: renew every 60-90 days for production
+- **Procedure**: SSHive handles rotation atomically (generate, deploy, archive old)
 
-### Passphrase GPG
+### GPG Passphrase
 
-- **Longueur** : 16+ caractères (ne réutilisez pas d'autres mots de passe)
-- **Stockage** : gestionnaire de mots de passe ou papier chiffré
-- **Test** : validez que votre passphrase fonctionne régulièrement
+- **Length**: 16+ characters (don't reuse other passwords)
+- **Storage**: password manager or encrypted paper
+- **Test**: validate your passphrase works regularly
 
 ### Audit
 
-- **Hebdomadaire** : consultez la page Santé pour alertes
-- **Mensuel** : vérifiez `audit.log` pour actions inattendues
-- **Annuel** : vérifiez la liste de clefs sur GitHub/GitLab vs config SSHive
+- **Weekly**: check Health page for alerts
+- **Monthly**: review `audit.log` for unexpected actions
+- **Yearly**: verify public key list on GitHub/GitLab vs SSHive config
 
-### Sauvegarde
+### Backup
 
-- **config.yaml** : sauvegardez régulièrement (versionne-la dans git privé si possible)
-- **secrets.yaml.gpg** : sauvegardez le fichier chiffré (illisible sans GPG)
-- **SK-Ed25519 `.pub`** : sauvegardez le fichier après génération (nécessaire pour révocation)
+- **config.yaml**: back up regularly (version in private git if possible)
+- **secrets.yaml.gpg**: back up the encrypted file (unreadable without GPG)
+- **SK-Ed25519 `.pub`**: back up after generation (needed for revocation)
 
-## Signalement de vulnérabilités
+## Report Vulnerabilities
 
-Si vous découvrez une faille de sécurité dans SSHive :
+If you discover a security flaw in SSHive:
 
-1. **Ne pas publier** l'exploit dans un issue public
-2. **Contactez** l'auteur via email (voir [GitHub](https://github.com/gfriloux/sshive))
-3. **Incluez** les détails : version, impact, PoC si pertinent
-4. **Attendez** une correction avant divulgation publique
+1. **Don't publish** the exploit in a public issue
+2. **Contact** the author via email (see [GitHub](https://github.com/gfriloux/sshive))
+3. **Include** details: version, impact, PoC if relevant
+4. **Wait** for a fix before public disclosure
 
-Toutes les vulnérabilités de sécurité sont traitées en priorité.
+All security vulnerabilities are treated as priority.
 
-## Limitations connues et acceptées
+## Known and Accepted Limitations
 
-1. **Attacker avec root** — si quelqu'un a accès root, il peut extraire les secrets. **Mitigation** : auditez l'accès root sur votre système.
+1. **Attacker with root** — if someone has root access, they can extract secrets. **Mitigation**: audit root access on your system.
 
-2. **Passphrases faibles** — une passphrase SSH faible peut être cassée en quelques heures. **Mitigation** : imposez une longueur minimale (défaut 12).
+2. **Weak passphrases** — a weak SSH passphrase can be cracked in hours. **Mitigation**: enforce minimum length (default 12).
 
-3. **Passphrase GPG en mémoire** — après déchiffrer `secrets.yaml.gpg`, la passphrase n'est pas immédiatement oubliée (GPG cache pendant un peu). **Mitigation** : passphrase GPG forte.
+3. **GPG passphrase in memory** — after decrypting `secrets.yaml.gpg`, the passphrase isn't immediately forgotten (GPG caches for a bit). **Mitigation**: strong GPG passphrase.
 
-4. **Compromise de GPG** — si votre clef GPG est compromise ou volée, tous les secrets le sont. **Mitigation** : protégez votre clef GPG avec une passphrase forte et une protection YubiKey.
+4. **Compromise of GPG** — if your GPG key is compromised or stolen, all secrets are exposed. **Mitigation**: protect your GPG key with a strong passphrase and YubiKey protection.
 
 ---
 
-Voir aussi :
-- [Configuration](/reference/configuration/) — format et emplacement des fichiers
-- [Clefs SSH](/guide/keys/) — générer et protéger les clefs
-- [Tokens API](/guide/tokens/) — configurer les tokens en toute sécurité
+See also:
+- [Configuration](/reference/configuration/) — file format and location
+- [SSH Keys](/guide/keys/) — generate and protect keys
+- [API Tokens](/guide/tokens/) — configure tokens safely

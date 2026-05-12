@@ -1,6 +1,6 @@
 ---
 title: SSHive
-description: Gestionnaire de clefs SSH desktop — une clef par service.
+description: SSH key manager for desktop — one key per service.
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
@@ -10,80 +10,80 @@ import detailImg from '../../assets/screenshots/detail-panel.png';
 
 # SSHive
 
-**Un gestionnaire de clefs SSH simple, sécurisé et philosophique.** Une clef par service. Déployée facilement. Renouvelée à bon escient.
+**A simple, secure, and principled SSH key manager.** One key per service. Deployed easily. Renewed wisely.
 
-SSHive est une application desktop (Rust + Iced) qui centralise vos clefs SSH, les protège avec GPG, et automatise leur déploiement vers GitHub, GitLab et vos serveurs SSH.
+SSHive is a desktop application (Tauri v2 + Svelte 5, Rust backend) that centralizes your SSH keys, protects them with GPG, and automates their deployment to GitHub, GitLab, and your SSH servers.
 
 <CardGrid>
-  <Card title="Démarrer" icon="rocket">
-    [Installation et configuration initiale](/installation/)
+  <Card title="Getting Started" icon="rocket">
+    [Installation and initial setup](/installation/)
   </Card>
-  <Card title="Démarrage rapide" icon="forward">
-    [5 minutes pour ajouter votre premier service](/quickstart/)
+  <Card title="Quick Start" icon="forward">
+    [Add your first service in 5 minutes](/quickstart/)
   </Card>
   <Card title="GitHub" icon="github">
-    [Code source et contributions](https://github.com/gfriloux/sshive)
+    [Source code and contributions](https://github.com/gfriloux/sshive)
   </Card>
 </CardGrid>
 
-## Philosophie : une clef par service
+## Philosophy: One key per service
 
-SSHive suit un principe simple et sain : **chaque service critique reçoit sa propre clef SSH**, plutôt que de réutiliser une clef générique.
+SSHive follows a simple and healthy principle: **each critical service receives its own SSH key**, rather than reusing a generic key.
 
-Avantages :
+Benefits:
 
-- **Isolation** — la compromission d'une clef n'expose que ce service
-- **Rotation indépendante** — renouveler une clef ne perturbe pas les autres services
-- **Audit clair** — tracer exactement qui a accès à quoi
-- **Conformité** — satisfait les exigences de sécurité des audits
+- **Isolation** — the compromise of one key exposes only that service
+- **Independent rotation** — renewing a key doesn't disrupt other services
+- **Clear audit** — trace exactly who has access to what
+- **Compliance** — satisfies security audit requirements
 
 <figure>
-  <Image src={servicesImg} alt="Vue principale de SSHive — liste des services avec indicateurs de santé ok, warning et critical" />
-  <figcaption>Vue principale : liste des services avec pastilles de santé, types de service et âge de rotation.</figcaption>
+  <Image src={servicesImg} alt="SSHive main view — service list with health indicators ok, warning and critical" />
+  <figcaption>Main view: service list with health badges, service types, and rotation age.</figcaption>
 </figure>
 
-## Fonctionnalités principales
+## Core Features
 
 <CardGrid>
   <Card title="Services" icon="list">
-    Gérez GitHub, GitLab, serveurs SSH génériques et déploiements externalisés (NixOS, Ansible…).
+    Manage GitHub, GitLab, generic SSH servers, and external deployments (NixOS, Ansible…).
   </Card>
-  <Card title="Clefs SSH" icon="lock">
-    Générez ed25519 ou sk-ed25519 (YubiKey), protégez par passphrase, renouvelez facilement.
+  <Card title="SSH Keys" icon="lock">
+    Generate ed25519 or sk-ed25519 (YubiKey), protect with passphrase, renew easily.
   </Card>
-  <Card title="Déploiement" icon="up">
-    Déploiement automatique via API GitHub/GitLab ou ssh-copy-id, mode guidé, ou intégration CM.
+  <Card title="Deployment" icon="up">
+    Automatic deployment via GitHub/GitLab API or ssh-copy-id, guided mode, or CM integration.
   </Card>
-  <Card title="Santé" icon="approve">
-    Vue diagnostique complète : clef manquante, non protégée, rotation dépassée, token API absent…
+  <Card title="Health" icon="approve">
+    Complete diagnostic view: missing key, unprotected, rotation overdue, missing API token…
   </Card>
 </CardGrid>
 
-## Sécurité au cœur
+## Security First
 
-- **Chiffrement GPG** — tous les secrets (tokens API, passphrases) sont chiffrés au repos
-- **Processus durci** — core dumps et ptrace bloqués au démarrage
-- **SSH key re-encryption pure Rust** — passphrases jamais exposées en ligne de commande
-- **Permissions strictes** — fichiers config/secrets avec mode `0600`
-- **Audit local** — journal append-only de toutes les rotations et révocations
+- **GPG encryption** — all secrets (API tokens, passphrases) are encrypted at rest
+- **Hardened process** — core dumps and ptrace blocked at startup
+- **Pure Rust SSH key re-encryption** — passphrases never exposed on command line
+- **Strict permissions** — config/secrets files with mode `0600`
+- **Local audit** — append-only log of all rotations and revocations
 
-Voir la [Politique de sécurité](/reference/security/) pour les détails complets.
+See the [Security Policy](/reference/security/) for full details.
 
-## Prérequis
+## Requirements
 
-- **NixOS ou Linux avec Nix** — SSHive se distribue via flake Nix
-- **GPG** — configuré et capable de générer ou importer des clefs
-- **SSH** — infrastructure SSH fonctionnelle (keys, config, permissions)
-- **Optionnel : YubiKey** — pour les clefs de sécurité matérielle sk-ed25519
+- **NixOS or Linux with Nix** — SSHive distributes via Nix flake
+- **GPG** — configured and capable of generating or importing keys
+- **SSH** — working SSH infrastructure (keys, config, permissions)
+- **Optional: YubiKey** — for hardware security key sk-ed25519
 
-## Prochaines étapes
+## Next Steps
 
-1. **[Installation](/installation/)** — installez SSHive via Nix flake
-2. **[Démarrage rapide](/quickstart/)** — ajoutez GitHub ou un premier service SSH
-3. **[Guides détaillés](/guide/services/)** — explorez services, clefs, déploiement
-4. **[Référence configuration](/reference/configuration/)** — maîtrisez le fichier YAML
+1. **[Installation](/installation/)** — install SSHive via Nix flake
+2. **[Quick Start](/quickstart/)** — add GitHub or your first SSH service
+3. **[Detailed Guides](/guide/services/)** — explore services, keys, deployment
+4. **[Configuration Reference](/reference/configuration/)** — master the YAML file
 
 ---
 
-**Code source** — [github.com/gfriloux/sshive](https://github.com/gfriloux/sshive)
-**Licence** — MIT
+**Source Code** — [github.com/gfriloux/sshive](https://github.com/gfriloux/sshive)
+**License** — MIT

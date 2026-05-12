@@ -1,202 +1,202 @@
 ---
-title: Tokens API
-description: Configurer et gérer les tokens API GitHub et GitLab.
+title: API Tokens
+description: Configure and manage GitHub and GitLab API tokens.
 ---
 
-SSHive utilise des **tokens API** pour accéder à GitHub et GitLab afin de déployer et révoquer vos clefs SSH automatiquement, sans avoir à les copier manuellement.
+SSHive uses **API tokens** to access GitHub and GitLab in order to deploy and revoke your SSH keys automatically, without having to copy them manually.
 
-## Pourquoi les tokens sont nécessaires
+## Why Tokens Are Necessary
 
-Les tokens permettent à SSHive de :
+Tokens allow SSHive to:
 
-1. **Déployer les clefs** via l'API (au lieu de `ssh-copy-id`)
-2. **Révoquer les clefs** à distance (en cas de compromission)
-3. **Vérifier le succès** du déploiement immédiatement
+1. **Deploy keys** via API (instead of `ssh-copy-id`)
+2. **Revoke keys** remotely (in case of compromise)
+3. **Verify success** of deployment immediately
 
-Sans token, vous êtes limité au **mode Guidé** (copier-coller les commandes).
+Without a token, you're limited to **Guided mode** (copy-paste commands).
 
-## Sécurité des tokens
+## Token Security
 
-SSHive traite les tokens avec attention :
+SSHive treats tokens with care:
 
-- **Chiffrement GPG** — tous les tokens sont immédiatement chiffrés et stockés dans `~/.config/sshive/secrets.yaml.gpg`
-- **Jamais en mémoire inutilement** — les tokens ne sont déchiffrés que quand ils sont utilisés
-- **Jamais dans les logs** — les tokens ne sont jamais affichés dans `audit.log` ou les messages d'erreur
-- **Révocation facile** — supprimez le token du service dans SSHive pour le "oublier" localement
+- **GPG encryption** — all tokens are immediately encrypted and stored in `~/.config/sshive/secrets.yaml.gpg`
+- **Never in memory unnecessarily** — tokens are decrypted only when used
+- **Never in logs** — tokens never appear in `audit.log` or error messages
+- **Easy revocation** — delete the token from the service in SSHive to "forget" it locally
 
-Voir la [Politique de sécurité](/reference/security/) pour plus de détails.
+See the [Security Policy](/reference/security/) for more details.
 
-## Tokens GitHub
+## GitHub Tokens
 
-### Obtenir un token GitHub
+### Get a GitHub Token
 
-1. Allez à [github.com/settings/tokens](https://github.com/settings/tokens)
-2. Cliquez **Generate new token (classic)**
-3. Donnez-lui un nom : `SSHive`
-4. **Scopes à cocher (IMPORTANT)** :
-   - ✓ `admin:public_key` — **SEUL scope à cocher**
+1. Go to [github.com/settings/tokens](https://github.com/settings/tokens)
+2. Click **Generate new token (classic)**
+3. Give it a name: `SSHive`
+4. **Scopes to check (IMPORTANT)**:
+   - ✓ `admin:public_key` — **ONLY scope to check**
    
-   Ce scope inclut implicitement `read:public_key`, ce qui suffit pour déployer et vérifier les clefs.
+   This scope implicitly includes `read:public_key`, which is sufficient for deploying and verifying keys.
 
-5. Cliquez **Generate token**
-6. **Copiez le token immédiatement** — GitHub ne le montrera qu'une fois
+5. Click **Generate token**
+6. **Copy the token immediately** — GitHub will only show it once
 
-### Configurer le token dans SSHive
+### Configure Token in SSHive
 
-**Lors de la création d'un service GitHub :**
+**When creating a GitHub service:**
 
-1. À l'**Étape 2**, collez le token dans le champ **Token API**
-2. Cliquez **Suivant**
+1. At **Step 2**, paste the token in the **API Token** field
+2. Click **Next**
 
-**Pour un service GitHub existant :**
+**For an existing GitHub service:**
 
-1. Sélectionnez le service dans la liste
-2. Cliquez **Éditer**
-3. À l'étape 2, cliquez **Configurer le token**
-4. Collez le nouveau token (il remplace l'ancien)
-5. Cliquez **Valider**
+1. Select the service from the list
+2. Click **Edit**
+3. At step 2, click **Configure token**
+4. Paste the new token (it replaces the old one)
+5. Click **Validate**
 
-### Scope détaillé
+### Scope Details
 
-Le scope `admin:public_key` inclut :
+The `admin:public_key` scope includes:
 
-- `read:public_key` — lire les clefs publiques de l'utilisateur
-- `write:public_key` — ajouter, supprimer les clefs publiques
+- `read:public_key` — read the user's public keys
+- `write:public_key` — add, delete the user's public keys
 
-C'est exactement ce que SSHive nécessite. **N'accordez pas de scopes supplémentaires.**
+This is exactly what SSHive needs. **Don't grant additional scopes.**
 
-### Tester le token
+### Test Token
 
-SSHive teste automatiquement le token avant de l'utiliser :
+SSHive automatically tests the token before using it:
 
-1. Valide le format du token (commence par `ghp_` ou `github_pat_`)
-2. Appel API `GET /user` pour vérifier l'authentification
-3. Alerte **DeployBlocker** si le test échoue
+1. Validates token format (starts with `ghp_` or `github_pat_`)
+2. API call `GET /user` to verify authentication
+3. Displays **DeployBlocker** alert if test fails
 
-## Tokens GitLab.com
+## GitLab.com Tokens
 
-### Obtenir un token GitLab
+### Get a GitLab Token
 
-**Pour GitLab.com :**
+**For GitLab.com:**
 
-1. Allez à [gitlab.com/profile/personal_access_tokens](https://gitlab.com/profile/personal_access_tokens)
-2. Cliquez **Add new token**
-3. Nom : `SSHive`
-4. **Scopes à cocher (IMPORTANT)** :
-   - ✓ `api` — accès à l'API (inclut `/user/keys`)
+1. Go to [gitlab.com/profile/personal_access_tokens](https://gitlab.com/profile/personal_access_tokens)
+2. Click **Add new token**
+3. Name: `SSHive`
+4. **Scopes to check (IMPORTANT)**:
+   - ✓ `api` — access to the API (includes `/user/keys`)
 
-5. Cliquez **Create personal access token**
-6. **Copiez le token immédiatement** — GitLab ne le montrera qu'une fois
+5. Click **Create personal access token**
+6. **Copy the token immediately** — GitLab will only show it once
 
-### Configurer le token dans SSHive
+### Configure Token in SSHive
 
-Même procédure que pour GitHub :
+Same procedure as GitHub:
 
-1. Créez ou éditez un service GitLab.com
-2. À l'étape 2, collez le token dans le champ **Token API**
-3. Validez
+1. Create or edit a GitLab.com service
+2. At step 2, paste the token in the **API Token** field
+3. Validate
 
-## Tokens GitLab auto-hébergé
+## Self-hosted GitLab Tokens
 
-### Obtenir un token (instance privée)
+### Get a Token (Private Instance)
 
-Pour une instance GitLab privée (ex : `https://gitlab.example.com`) :
+For a private GitLab instance (ex: `https://gitlab.example.com`):
 
-1. Allez à `https://gitlab.example.com/profile/personal_access_tokens`
-2. Cliquez **Add new token**
-3. Nom : `SSHive`
-4. **Scope** : ✓ `api`
-5. Cliquez **Create personal access token**
-6. Copiez le token
+1. Go to `https://gitlab.example.com/profile/personal_access_tokens`
+2. Click **Add new token**
+3. Name: `SSHive`
+4. **Scope**: ✓ `api`
+5. Click **Create personal access token**
+6. Copy the token
 
-### Configurer dans SSHive
+### Configure in SSHive
 
-1. Créez un service GitLab auto-hébergé
-2. Entrez l'**URL de base** : `https://gitlab.example.com`
-3. À l'étape 2, collez le token
-4. Validez
+1. Create a self-hosted GitLab service
+2. Enter the **Base URL**: `https://gitlab.example.com`
+3. At step 2, paste the token
+4. Validate
 
-SSHive utilisera l'URL pour faire les appels API automatiquement.
+SSHive will use the URL to make API calls automatically.
 
-## Gestion des tokens
+## Token Management
 
-### Lister les tokens configurés
+### List Configured Tokens
 
-Allez à **Paramètres** → **Données** pour voir la liste des services avec tokens configurés.
+Go to **Settings** → **Data** to see the list of services with tokens configured.
 
-Les tokens eux-mêmes ne sont pas affichés (pour la sécurité), seulement leur présence est indiquée.
+Tokens themselves are not displayed (for security), only their presence is indicated.
 
-### Supprimer un token
+### Delete a Token
 
-1. Sélectionnez le service dans la liste
-2. Cliquez **Éditer**
-3. À l'étape 2, cliquez **Supprimer le token**
-4. Validez
+1. Select the service from the list
+2. Click **Edit**
+3. At step 2, click **Delete token**
+4. Validate
 
-Le token local est oublié. Le token sur GitHub/GitLab reste valide jusqu'à ce que vous le révoquiez manuellement sur le site.
+The local token is forgotten. The token on GitHub/GitLab remains valid until you manually revoke it on the site.
 
-### Révoquer un token sur le site
+### Revoke Token on Site
 
-Si vous avez compromis un token ou souhaitez l'arrêter :
+If you've compromised a token or want to stop it:
 
-**GitHub :**
+**GitHub:**
 
-1. Allez à [github.com/settings/tokens](https://github.com/settings/tokens)
-2. Trouvez le token `SSHive`
-3. Cliquez **Delete**
+1. Go to [github.com/settings/tokens](https://github.com/settings/tokens)
+2. Find the `SSHive` token
+3. Click **Delete**
 
-**GitLab.com :**
+**GitLab.com:**
 
-1. Allez à [gitlab.com/profile/personal_access_tokens](https://gitlab.com/profile/personal_access_tokens)
-2. Trouvez le token
-3. Cliquez la poubelle
+1. Go to [gitlab.com/profile/personal_access_tokens](https://gitlab.com/profile/personal_access_tokens)
+2. Find the token
+3. Click the trash icon
 
-La révocation est immédiate. Les futures tentatives de SSHive échoueront.
+Revocation is immediate. Future SSHive attempts will fail.
 
-## Rotation de tokens
+## Token Rotation
 
-Il est bonne pratique de **changer les tokens régulièrement** (tous les 6-12 mois).
+It's good practice to **change tokens regularly** (every 6-12 months).
 
-**Procédure :**
+**Procedure:**
 
-1. Générez un nouveau token sur GitHub/GitLab
-2. Allez à SSHive et mettez à jour le token du service (Éditer → Configurer le token)
-3. Vérifiez que le déploiement fonctionne
-4. Allez à GitHub/GitLab et supprimez l'ancien token
+1. Generate a new token on GitHub/GitLab
+2. Go to SSHive and update the service token (Edit → Configure token)
+3. Verify that deployment works
+4. Go to GitHub/GitLab and delete the old token
 
-## Dépannage
+## Troubleshooting
 
-### "Token invalide" ou "Authentification échouée"
+### "Invalid token" or "Authentication failed"
 
-- Vérifiez que vous avez copié l'**intégralité du token** (pas de caractères manquants)
-- Vérifiez que le token n'a **pas encore expiré**
-- Vérifiez les **scopes** : GitHub doit avoir `admin:public_key`, GitLab doit avoir `api`
+- Verify you copied the **entire token** (no missing characters)
+- Verify the token **hasn't expired**
+- Verify the **scopes**: GitHub must have `admin:public_key`, GitLab must have `api`
 
-### Service GitHub/GitLab aparaît en "warning : NoApiToken"
+### GitHub/GitLab service shows "warning: NoApiToken"
 
-Cela signifie qu'aucun token n'est configuré. Allez à **Éditer** le service et ajoutez le token.
+This means no token is configured. Go to **Edit** the service and add the token.
 
-### Vérification du token échoue avec "DeployBlocker"
+### Token verification fails with "DeployBlocker"
 
-- Vérifiez la **connectivité Internet** (SSHive appelle l'API)
-- Vérifiez que le token n'a **pas expiré** ou a été révoqué
-- Vérifiez que votre compte GitHub/GitLab n'a pas de problème (2FA bloquant, etc.)
+- Check **Internet connectivity** (SSHive calls the API)
+- Verify the token **hasn't expired** or been revoked
+- Verify your GitHub/GitLab account has no issues (2FA blocking, etc.)
 
-## Bonnes pratiques
+## Best Practices
 
-**Un token par service, ou un partagé ?** — Pour la simplicité, vous pouvez utiliser le même token pour tous vos services GitHub. Pour l'isolation, générez un token par service (pas nécessaire pour la sécurité, juste la traçabilité).
+**One token per service, or shared?** — For simplicity, you can use the same token for all your GitHub services. For isolation, generate one token per service (not necessary for security, just traceability).
 
-**Passphrases fortes sur les tokens** — les tokens sont stockés chiffrés avec GPG, donc leur sécurité dépend de votre passphrase GPG.
+**Strong passphrases on tokens** — tokens are stored encrypted with GPG, so their security depends on your GPG passphrase.
 
-**Révoquez immédiatement en cas de fuite** — si vous exposez accidentellement un token, allez sur GitHub/GitLab et supprimez-le.
+**Revoke immediately if leaked** — if you accidentally expose a token, go to GitHub/GitLab and delete it.
 
-**Stockez nulle part ailleurs** — n'ajoutez jamais un token à `config.yaml` ou un fichier non chiffré. SSHive le fait pour vous (secrets.yaml.gpg).
+**Store nowhere else** — never add a token to `config.yaml` or an unencrypted file. SSHive does this for you (secrets.yaml.gpg).
 
-**Rotation régulière** — tous les 6-12 mois, générez un nouveau token et remplacez l'ancien dans SSHive.
+**Regular rotation** — every 6-12 months, generate a new token and replace the old one in SSHive.
 
 ---
 
-Voir aussi :
-- [Services](/guide/services/) — créer des services GitHub/GitLab
-- [Sécurité](/reference/security/) — politique et philosophie de sécurité
-- [Configuration](/reference/configuration/) — structure des fichiers de configuration
+See also:
+- [Services](/guide/services/) — create GitHub/GitLab services
+- [Security](/reference/security/) — security policy and philosophy
+- [Configuration](/reference/configuration/) — config file structure

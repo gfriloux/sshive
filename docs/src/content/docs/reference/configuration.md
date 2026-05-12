@@ -1,23 +1,23 @@
 ---
 title: Configuration
-description: Schéma YAML complet et structure de configuration SSHive.
+description: Complete YAML schema and SSHive configuration structure.
 ---
 
-SSHive stocke sa configuration dans un fichier YAML situé à :
+SSHive stores its configuration in a YAML file located at:
 
 ```
 ~/.config/sshive/config.yaml
 ```
 
-Ce fichier contient la liste de vos services, clefs SSH, et préférences globales.
+This file contains your list of services, SSH keys, and global preferences.
 
-## Emplacement et permissions
+## Location and Permissions
 
-Le fichier `config.yaml` est créé automatiquement au premier lancement avec les permissions `0600` (lecture/écriture utilisateur seulement).
+The `config.yaml` file is automatically created on first launch with permissions `0600` (read/write user only).
 
-SSHive restitue une alerte si les permissions sont trop permissives (lisibles par d'autres utilisateurs).
+SSHive displays an alert if permissions are too permissive (readable by other users).
 
-## Structure globale
+## Overall Structure
 
 ```yaml
 security:
@@ -31,50 +31,50 @@ gpg:
 services:
   - name: "GitHub"
     service_type: "github"
-    # ... (voir section services ci-dessous)
+    # ... (see services section below)
 
 ssh_keys:
   - uuid: "550e8400-e29b-41d4-a716-446655440000"
-    # ... (voir section clefs ci-dessous)
+    # ... (see keys section below)
 ```
 
-## Section Security
+## Security Section
 
 ```yaml
 security:
-  min_passphrase_len: 12              # Longueur minimale de passphrase (défaut 12)
-  rotation_warning_days: 90           # Jours avant alerte de rotation (défaut 90)
+  min_passphrase_len: 12              # Minimum passphrase length (default 12)
+  rotation_warning_days: 90           # Days before rotation alert (default 90)
 ```
 
-**Valeurs par défaut :**
-- `min_passphrase_len: 12` — conforme NIST SP 800-63B
-- `rotation_warning_days: 90` — alerte après 90 jours sans rotation
+**Default values:**
+- `min_passphrase_len: 12` — compliant with NIST SP 800-63B
+- `rotation_warning_days: 90` — alert after 90 days without rotation
 
-## Section GPG
+## GPG Section
 
 ```yaml
 gpg:
-  key_id: "ABC123DEF456789..."       # ID court ou long de la clef GPG
-  pinentry_backend: "gnome3"          # gnome3, qt, gtk2 (optionnel)
+  key_id: "ABC123DEF456789..."       # Short or long ID of GPG key
+  pinentry_backend: "gnome3"          # gnome3, qt, gtk2 (optional)
 ```
 
-**Explications :**
+**Explanations:**
 
-- `key_id` — identificateur unique de votre clef GPG utilisée pour chiffrer les secrets
-  - Peut être un ID court (16 caractères hex) ou long (40 caractères)
-  - Affiché dans **Paramètres** → **GPG**
+- `key_id` — unique identifier of your GPG key used to encrypt secrets
+  - Can be short ID (16 hex characters) or long ID (40 characters)
+  - Displayed in **Settings** → **GPG**
 
-- `pinentry_backend` — agent de saisie de passphrase (optionnel, auto-détecté)
-  - `gnome3` — GNOME (utilisé sur Ubuntu GNOME, Fedora GNOME…)
+- `pinentry_backend` — passphrase entry agent (optional, auto-detected)
+  - `gnome3` — GNOME (used on Ubuntu GNOME, Fedora GNOME…)
   - `qt` — KDE Plasma
-  - `gtk2` — fallback universel
-  - Omettez ce champ pour laisser SSHive auto-détecter à partir de `XDG_CURRENT_DESKTOP`
+  - `gtk2` — universal fallback
+  - Omit this field to let SSHive auto-detect from `XDG_CURRENT_DESKTOP`
 
-## Section Services
+## Services Section
 
-Chaque service représente une destination SSH (GitHub, GitLab, serveur).
+Each service represents an SSH destination (GitHub, GitLab, server).
 
-### Structure générale d'un service
+### General Service Structure
 
 ```yaml
 services:
@@ -92,50 +92,50 @@ services:
     comment: "SSH key for GitHub public repositories"
 ```
 
-### Champs obligatoires
+### Required Fields
 
-| Champ | Type | Exemple | Notes |
+| Field | Type | Example | Notes |
 |-------|------|---------|-------|
-| `name` | string | `"GitHub"` | Nom unique, affiché dans la liste |
+| `name` | string | `"GitHub"` | Unique name, displayed in list |
 | `service_type` | enum | `"github"` | `github` \| `gitlab` \| `gitlab-self-hosted` \| `ssh-generic` |
-| `hostname` | string | `"github.com"` | Domaine ou IP du service |
+| `hostname` | string | `"github.com"` | Domain or IP of the service |
 
-### Champs spécifiques par type
+### Type-Specific Fields
 
-**GitHub :**
+**GitHub:**
 
 ```yaml
 service_type: "github"
-hostname: "github.com"           # Auto-rempli, normalement "github.com"
-username: "git"                  # Auto-rempli
-port: 22                         # Auto-rempli
-token_ref: "secrets.github_token"  # Référence au token chiffré dans secrets.yaml.gpg
+hostname: "github.com"           # Auto-filled, normally "github.com"
+username: "git"                  # Auto-filled
+port: 22                         # Auto-filled
+token_ref: "secrets.github_token"  # Reference to encrypted token in secrets.yaml.gpg
 deploy_mode: "automatic"         # automatic | guided
 ```
 
-**GitLab.com :**
+**GitLab.com:**
 
 ```yaml
 service_type: "gitlab"
-hostname: "gitlab.com"           # Auto-rempli
-username: "git"                  # Auto-rempli
+hostname: "gitlab.com"           # Auto-filled
+username: "git"                  # Auto-filled
 port: 22
 token_ref: "secrets.gitlab_token"
 deploy_mode: "automatic"
 ```
 
-**GitLab auto-hébergé :**
+**Self-hosted GitLab:**
 
 ```yaml
 service_type: "gitlab-self-hosted"
-hostname: "https://gitlab.example.com"  # URL complète
+hostname: "https://gitlab.example.com"  # Full URL
 username: "git"
 port: 22
 token_ref: "secrets.gitlab_custom_token"
 deploy_mode: "automatic" | "guided"
 ```
 
-**SSH générique :**
+**Generic SSH:**
 
 ```yaml
 service_type: "ssh-generic"
@@ -145,22 +145,22 @@ port: 2222
 deploy_mode: "automatic" | "guided" | "external-cm"
 ```
 
-### Champs optionnels (tous les services)
+### Optional Fields (All Services)
 
-| Champ | Type | Défaut | Signification |
-|-------|------|--------|---------------|
-| `username` | string | `"git"` (GitHub/GitLab) | Utilisateur SSH |
-| `port` | integer | `22` | Port SSH |
-| `active_key` | string (UUID) | `null` | UUID de la clef SSH attachée |
-| `pending_key` | string (UUID) | `null` | UUID de la clef en cours de déploiement |
-| `token_ref` | string | `null` | Référence au token API dans secrets.yaml.gpg |
+| Field | Type | Default | Meaning |
+|-------|------|---------|---------|
+| `username` | string | `"git"` (GitHub/GitLab) | SSH user |
+| `port` | integer | `22` | SSH port |
+| `active_key` | string (UUID) | `null` | UUID of attached SSH key |
+| `pending_key` | string (UUID) | `null` | UUID of key being deployed |
+| `token_ref` | string | `null` | Reference to API token in secrets.yaml.gpg |
 | `deploy_mode` | enum | `"automatic"` | `automatic` \| `guided` \| `external-cm` |
-| `created_at` | ISO 8601 | auto | Timestamp de création du service |
-| `last_rotation` | ISO 8601 | auto | Timestamp de la dernière rotation de clef |
-| `deployments` | array | `[]` | Historique des déploiements (voir ci-dessous) |
-| `comment` | string | `""` | Note interne sur le service |
+| `created_at` | ISO 8601 | auto | Service creation timestamp |
+| `last_rotation` | ISO 8601 | auto | Last key rotation timestamp |
+| `deployments` | array | `[]` | Deployment history (see below) |
+| `comment` | string | `""` | Internal note on service |
 
-### Champ Deployments (historique)
+### Deployments Field (History)
 
 ```yaml
 deployments:
@@ -176,9 +176,9 @@ deployments:
     error_message: "SSH connection timed out"
 ```
 
-## Section SSH Keys
+## SSH Keys Section
 
-Chaque clef SSH est stockée localement avec métadonnées.
+Each SSH key is stored locally with metadata.
 
 ```yaml
 ssh_keys:
@@ -194,32 +194,32 @@ ssh_keys:
     comment: "Generated by SSHive"
 ```
 
-### Champs de clefs
+### Key Fields
 
-| Champ | Type | Exemple | Notes |
+| Field | Type | Example | Notes |
 |-------|------|---------|-------|
-| `uuid` | string (UUID v4) | `"550e8400-e29b-41d4-a716-446655440000"` | Identificateur unique stable (basé sur fingerprint) |
-| `fingerprint` | string | `"SHA256:abc123def456789..."` | Fingerprint SHA256 de la clef publique |
-| `public_path` | string | `"/home/user/.ssh/id_sshive_github.pub"` | Chemin du fichier `.pub` |
-| `private_path` | string | `"/home/user/.ssh/id_sshive_github"` | Chemin du fichier clef privée |
+| `uuid` | string (UUID v4) | `"550e8400-e29b-41d4-a716-446655440000"` | Stable unique identifier (based on fingerprint) |
+| `fingerprint` | string | `"SHA256:abc123def456789..."` | SHA256 fingerprint of public key |
+| `public_path` | string | `"/home/user/.ssh/id_sshive_github.pub"` | Path to `.pub` file |
+| `private_path` | string | `"/home/user/.ssh/id_sshive_github"` | Path to private key file |
 | `key_type` | enum | `"ed25519"` | `ed25519` \| `sk-ed25519` |
-| `key_size` | integer | `256` | Bits de clef (toujours 256 pour ed25519) |
-| `created_at` | ISO 8601 | `"2026-05-11T10:34:22Z"` | Timestamp de génération |
-| `protected` | boolean | `true` | Clef chiffrée par passphrase |
-| `backup_prompted` | boolean | `false` | Pour SK-Ed25519 : passphrase `.pub` sauvegardée confirmée |
-| `comment` | string | `"GitHub deployment key"` | Comment optionnel |
+| `key_size` | integer | `256` | Key bits (always 256 for ed25519) |
+| `created_at` | ISO 8601 | `"2026-05-11T10:34:22Z"` | Generation timestamp |
+| `protected` | boolean | `true` | Key encrypted with passphrase |
+| `backup_prompted` | boolean | `false` | For SK-Ed25519: backup confirmed |
+| `comment` | string | `"GitHub deployment key"` | Optional comment |
 
 ## Secrets (secrets.yaml.gpg)
 
-Les tokens API et autres secrets sont chiffrés dans un fichier séparé :
+API tokens and other secrets are encrypted in a separate file:
 
 ```
 ~/.config/sshive/secrets.yaml.gpg
 ```
 
-Ce fichier ne doit **jamais** être édité manuellement. SSHive le gère complètement.
+This file should **never** be edited manually. SSHive manages it completely.
 
-Structure déchiffrée (ne pas toucher) :
+Decrypted structure (don't touch):
 
 ```yaml
 tokens:
@@ -233,13 +233,13 @@ tokens:
 
 ## Audit Log
 
-Chaque action est enregistrée dans :
+Every action is recorded in:
 
 ```
 ~/.config/sshive/audit.log
 ```
 
-Format :
+Format:
 
 ```
 2026-05-11T14:35:22Z [sshive] Generated SSH key ed25519 for service GitHub (fingerprint: abc123...)
@@ -248,9 +248,9 @@ Format :
 2026-05-12T09:10:33Z [sshive] Revoked key from GitLab
 ```
 
-Les logs ne contiennent **jamais** les tokens API ou passphrases.
+Logs **never** contain API tokens or passphrases.
 
-## Exemple complet
+## Complete Example
 
 ```yaml
 security:
@@ -319,37 +319,37 @@ ssh_keys:
     comment: "Production deploy key"
 ```
 
-## Gestion manuelle (avancé)
+## Manual Management (Advanced)
 
-SSHive restitue une alerte si `config.yaml` est modifié à l'extérieur de l'application. Les modifications manuelles peuvent casser la cohérence.
+SSHive displays an alert if `config.yaml` is modified outside the application. Manual edits can break consistency.
 
-**Si vous modifiez manuellement :**
+**If you manually edit:**
 
-1. Faites une sauvegarde : `cp ~/.config/sshive/config.yaml ~/.config/sshive/config.yaml.bak`
-2. Éditez avec votre éditeur
-3. Redémarrez SSHive et vérifiez les alertes
-4. Consultez la page **Santé** pour vérifier la cohérence
+1. Make a backup: `cp ~/.config/sshive/config.yaml ~/.config/sshive/config.yaml.bak`
+2. Edit with your editor
+3. Restart SSHive and check alerts
+4. Check the **Health** page to verify consistency
 
-**Cas d'usage valides :**
+**Valid use cases:**
 
-- Ajouter un commentaire
-- Corriger un typo dans `hostname` ou `username`
-- Restaurer depuis une sauvegarde
+- Add a comment
+- Fix a typo in `hostname` or `username`
+- Restore from backup
 
-**Cas à éviter :**
+**Cases to avoid:**
 
-- Modifier `uuid` ou `fingerprint` (incohérence)
-- Ajouter des services sans clef valide
-- Modifier `secrets.yaml.gpg` (chiffré, incompréhensible)
+- Modify `uuid` or `fingerprint` (inconsistency)
+- Add services without valid keys
+- Modify `secrets.yaml.gpg` (encrypted, incomprehensible)
 
-## Migration depuis d'autres gestionnaires
+## Migration from Other Managers
 
-Si vous avez un fichier config d'une autre version SSHive, SSHive le migre automatiquement avec backward-compatibility totale.
+If you have a config file from another SSHive version, SSHive migrates it automatically with full backward-compatibility.
 
-Voir le [Changelog](/reference/changelog/) pour les détails de migration de v0.1 à v0.4.
+See the [Changelog](/reference/changelog/) for migration details from v0.1 to v0.4.
 
 ---
 
-Voir aussi :
-- [Sécurité](/reference/security/) — philosophie de sécurité
-- [Changelog](/reference/changelog/) — historique des versions
+See also:
+- [Security](/reference/security/) — security philosophy
+- [Changelog](/reference/changelog/) — version history

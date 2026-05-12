@@ -1,45 +1,45 @@
 ---
 title: Installation
-description: Installez SSHive sur votre système Linux avec Nix.
+description: Install SSHive on your Linux system with Nix.
 ---
 
-SSHive se distribue via **flake Nix** et est conçu pour fonctionner sur NixOS et tout système Linux avec Nix.
+SSHive distributes via **Nix flake** and is designed to work on NixOS and any Linux system with Nix.
 
-## Prérequis
+## Prerequisites
 
-- **Nix 2.13+** ([installer Nix](https://nixos.org/download.html))
-- **GPG 2.2+** — déjà inclus dans la plupart des distributions Linux
-- **SSH configuré** — clefs publiques/privées existantes dans `~/.ssh/`
+- **Nix 2.13+** ([install Nix](https://nixos.org/download.html))
+- **GPG 2.2+** — already included in most Linux distributions
+- **SSH configured** — existing public/private keys in `~/.ssh/`
 
-## Installation rapide
+## Quick Installation
 
-Pour exécuter SSHive sans l'installer de manière permanente :
+To run SSHive without a permanent installation:
 
 ```bash
 nix run github:gfriloux/sshive
 ```
 
-C'est la meilleure façon de l'essayer pour la première fois.
+This is the best way to try it for the first time.
 
-## Installation persistante (recommandé)
+## Persistent Installation (Recommended)
 
-Pour installer SSHive dans votre profil utilisateur :
+To install SSHive in your user profile:
 
 ```bash
 nix profile install github:gfriloux/sshive
 ```
 
-Lancez ensuite :
+Then launch:
 
 ```bash
 sshive
 ```
 
-L'application crée automatiquement le répertoire `~/.config/sshive/` au premier lancement.
+The application automatically creates the `~/.config/sshive/` directory on first launch.
 
-## Développement local
+## Local Development
 
-Si vous souhaitez développer ou compiler à partir de la source :
+If you want to develop or compile from source:
 
 ```bash
 git clone https://github.com/gfriloux/sshive.git
@@ -47,91 +47,91 @@ cd sshive
 nix develop
 ```
 
-Vous êtes maintenant dans un shell de développement avec Rust, Cargo et toutes les dépendances. Pour lancer l'application :
+You're now in a development shell with Rust, Cargo, and all dependencies. To run the application:
 
 ```bash
 cargo run --release
 ```
 
-## Configuration initiale
+## Initial Configuration
 
-Au premier lancement, SSHive crée la structure suivante :
+On first launch, SSHive creates the following structure:
 
 ```
 ~/.config/sshive/
-├── config.yaml         # Configuration services et clefs
-├── audit.log           # Journal des actions (chmod 0600)
-└── secrets.yaml.gpg    # Tokens API chiffrés avec GPG
+├── config.yaml         # Services and keys configuration
+├── audit.log           # Action log (chmod 0600)
+└── secrets.yaml.gpg    # API tokens encrypted with GPG
 ```
 
-L'application scanne aussi automatiquement `~/.ssh/` pour découvrir vos clefs publiques existantes (ed25519 et sk-ed25519).
+The application also automatically scans `~/.ssh/` to discover your existing public keys (ed25519 and sk-ed25519).
 
-### Sélectionner une clef GPG
+### Select a GPG Key
 
-Au premier lancement, SSHive vous demandera de sélectionner une clef GPG pour chiffrer les secrets. Vous pouvez :
+On first launch, SSHive will ask you to select a GPG key to encrypt secrets. You can:
 
-1. **Sélectionner une clef existante** — si vous avez déjà une clef GPG
-2. **Créer une nouvelle clef** — SSHive peut générer une clef Ed25519 directement en GUI
-3. **Utiliser le terminal** — exécuter `gpg --generate-key` si vous préférez
+1. **Select an existing key** — if you already have a GPG key
+2. **Create a new key** — SSHive can generate an Ed25519 key directly in the GUI
+3. **Use the terminal** — run `gpg --generate-key` if you prefer
 
-### Backend Pinentry
+### Pinentry Backend
 
-SSHive détecte automatiquement votre environnement de bureau et sélectionne le bon agent de saisie de passphrase :
+SSHive automatically detects your desktop environment and selects the correct passphrase entry agent:
 
 - **GNOME** → `pinentry-gnome3`
 - **KDE** → `pinentry-qt`
-- **Autres** → `pinentry-gtk-2` (fallback)
+- **Other** → `pinentry-gtk-2` (fallback)
 
-Vous pouvez forcer un backend spécifique avec :
+You can force a specific backend with:
 
 ```bash
 export SSHIVE_PINENTRY=pinentry-gnome3
 sshive
 ```
 
-## Mise à jour
+## Updates
 
-Pour mettre à jour vers la dernière version :
+To update to the latest version:
 
 ```bash
 nix profile upgrade
 ```
 
-Ou si vous utilisez `nix run` :
+Or if you use `nix run`:
 
 ```bash
 nix run --update-input sshive github:gfriloux/sshive
 ```
 
-## Dépannage
+## Troubleshooting
 
-### SSHive ne démarre pas
+### SSHive won't start
 
-- Vérifiez que GPG est fonctionnel : `gpg --list-keys`
-- Vérifiez les logs : `~/.config/sshive/audit.log`
-- Assurez-vous que vous avez au moins une clef GPG disponible
+- Check that GPG is working: `gpg --list-keys`
+- Check the logs: `~/.config/sshive/audit.log`
+- Make sure you have at least one GPG key available
 
-### Passphrases ne s'affichent pas
+### Passphrases not appearing
 
-- Vérifiez que `pinentry` est installé : `which pinentry-gnome3` (ou votre backend)
-- Essayez de forcer un backend : `SSHIVE_PINENTRY=pinentry-gtk-2 sshive`
+- Check that `pinentry` is installed: `which pinentry-gnome3` (or your backend)
+- Try forcing a backend: `SSHIVE_PINENTRY=pinentry-gtk-2 sshive`
 
-### Problèmes de permissions
+### Permission issues
 
-SSHive crée tous les fichiers en mode `0600` (lecture/écriture utilisateur seul). Si vous voyez des erreurs de permission :
+SSHive creates all files with mode `0600` (read/write user only). If you see permission errors:
 
 ```bash
-# Vérifiez les permissions du répertoire de config
+# Check the permissions of the config directory
 ls -la ~/.config/sshive/
 ```
 
-Elles doivent être `drw-------` (0700). Si ce n'est pas le cas :
+They should be `drw-------` (0700). If not:
 
 ```bash
 chmod 700 ~/.config/sshive/
 chmod 600 ~/.config/sshive/*
 ```
 
-## Prochaines étapes
+## Next Steps
 
-Une fois installé, suivez le [Démarrage rapide](/quickstart/) pour ajouter votre premier service.
+Once installed, follow the [Quick Start](/quickstart/) to add your first service.

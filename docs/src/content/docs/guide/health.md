@@ -1,196 +1,196 @@
 ---
-title: Santé et diagnostics
-description: Comprendre l'état de santé de vos services et clefs SSH.
+title: Health and Diagnostics
+description: Understand the health status of your services and SSH keys.
 ---
 
-La **page Santé** (accessible via la barre latérale) affiche une vue diagnostique complète de tous vos services et clefs, ainsi que les alertes de sécurité.
+The **Health page** (accessible from the sidebar) displays a complete diagnostic view of all your services and keys, as well as security alerts.
 
-## Niveaux de santé
+## Health Levels
 
-Chaque service et clef reçoit un **niveau de santé** indiqué par une pastille et un label :
+Each service and key receives a **health level** indicated by a badge and label:
 
-### ✓ ok (vert)
+### ✓ ok (green)
 
-Tout est en ordre.
+Everything is in order.
 
-**Critères :**
-- Clef SSH attachée au service
-- Clef protégée par passphrase
-- Si GitHub/GitLab : token API valide (dernièrement vérifié)
-- Clef déployée avec succès
-- Pas de rotation dépassée
+**Criteria:**
+- SSH key attached to service
+- Key protected by passphrase
+- If GitHub/GitLab: API token valid (recently verified)
+- Key deployed successfully
+- No rotation overdue
 
-### ⓘ info (bleu)
+### ⓘ info (blue)
 
-Situation à noter, pas d'urgence.
+Situation to note, no urgency.
 
-**Raisons courantes :**
-- `HardwareKeyHandleNotBackedUp` — clef SK (YubiKey) dont le fichier `.pub` n'a pas été sauvegardé
-- Clef de plus de 30 jours sans rotation
-- Déploiement en cours
+**Common reasons:**
+- `HardwareKeyHandleNotBackedUp` — SK key (YubiKey) whose `.pub` file hasn't been backed up
+- Key over 30 days old without rotation
+- Deployment in progress
 
-**Action suggérée :** sauvegardez le fichier de clef ou planifiez une rotation.
+**Suggested action:** back up the key file or plan a rotation.
 
 ### ⚠ warning (orange)
 
-Situation à corriger prochainement.
+Situation to correct soon.
 
-**Raisons courantes :**
-- `NoKey` — aucune clef attribuée au service
-- `NoApiToken` — service GitHub/GitLab sans token API (déploiement manuel seulement)
-- `KeyUnprotected` — clef SSH existante sans passphrase
-- `RotationRecommended` — clef atteint le seuil d'alerte (défaut 90 jours)
+**Common reasons:**
+- `NoKey` — no key assigned to the service
+- `NoApiToken` — GitHub/GitLab service without API token (manual deployment only)
+- `KeyUnprotected` — existing SSH key without passphrase
+- `RotationRecommended` — key reaches alert threshold (default 90 days)
 
-**Action suggérée :** générez une clef, ajoutez un token API, ou protégez la clef existante.
+**Suggested action:** generate a key, add an API token, or protect the existing key.
 
-### ✗ critical (rouge)
+### ✗ critical (red)
 
-Problème de sécurité immédiat.
+Immediate security issue.
 
-**Raisons courantes :**
-- `NoKey` + `RotationOverdue` — service sans clef ET clef actuelle trop ancienne
-- `NoApiToken` + `RotationOverdue` — service GitHub/GitLab sans token ET clef trop ancienne
+**Common reasons:**
+- `NoKey` + `RotationOverdue` — service without key AND current key too old
+- `NoApiToken` + `RotationOverdue` — GitHub/GitLab service without token AND key too old
 
-**Action suggérée :** générez immédiatement une nouvelle clef et déployez-la.
+**Suggested action:** immediately generate and deploy a new key.
 
-## Raisons de santé détaillées
+## Detailed Health Reasons
 
-### Service : aucune clef assignée
+### Service: No key assigned
 
 ```
 NoKey
 ```
 
-**Signification :** le service n'a pas de clef SSH attachée.
+**Meaning:** the service has no SSH key attached.
 
-**Causes possibles :**
-- Service venant d'être créé, clef non encore générée
-- Clef précédente supprimée
-- Erreur lors de la création du service
+**Possible causes:**
+- Service just created, key not yet generated
+- Previous key deleted
+- Error during service creation
 
-**Correction :**
-1. Allez au détail du service
-2. Cliquez **Générer une nouvelle clef** ou **Sélectionner une clef existante**
-3. Déployez la clef
+**Fix:**
+1. Go to the service detail
+2. Click **Generate a new key** or **Select an existing key**
+3. Deploy the key
 
-### Service : clef non protégée
+### Service: Key not protected
 
 ```
 KeyUnprotected
 ```
 
-**Signification :** la clef SSH n'a pas de passphrase.
+**Meaning:** the SSH key has no passphrase.
 
-**Risque :** si quelqu'un accède à `~/.ssh/`, il peut utiliser la clef sans saisir de passphrase.
+**Risk:** if someone accesses `~/.ssh/`, they can use the key without entering a passphrase.
 
-**Correction :**
-1. Allez au détail de la clef
-2. Cliquez **Ajouter une passphrase**
-3. Entrez une passphrase (≥ 12 caractères)
+**Fix:**
+1. Go to the key detail
+2. Click **Add a passphrase**
+3. Enter a passphrase (≥ 12 characters)
 
-### Rotation dépassée
+### Rotation Overdue
 
 ```
-RotationOverdue (85 jours)
+RotationOverdue (85 days)
 ```
 
-**Signification :** la clef n'a pas été renouvelée depuis longtemps.
+**Meaning:** the key hasn't been renewed in a long time.
 
-**Causes possibles :**
-- Clef créée il y a plus de X jours (défaut 90 jours)
-- Pas de rotation planifiée
-- Configuration de seuil trop restrictive
+**Possible causes:**
+- Key created more than X days ago (default 90 days)
+- No planned rotation
+- Threshold configuration too restrictive
 
-**Correction :**
-1. Allez au détail du service
-2. Cliquez **Renouveler la clef SSH**
-3. Confirmez la rotation
-4. La nouvelle clef est générée et déployée
-5. L'ancienne clef est archivée
+**Fix:**
+1. Go to the service detail
+2. Click **Renew SSH key**
+3. Confirm the rotation
+4. The new key is generated and deployed
+5. The old key is archived
 
-Vous pouvez ajuster le seuil d'alerte dans **Paramètres** → **Sécurité** → **Rotation warning threshold**.
+You can adjust the alert threshold in **Settings** → **Security** → **Rotation warning threshold**.
 
-### Pas de token API
+### No API Token
 
 ```
 NoApiToken
 ```
 
-**Signification :** le service est GitHub/GitLab mais aucun token API n'est configuré.
+**Meaning:** the service is GitHub/GitLab but no API token is configured.
 
-**Impact :**
-- Déploiement en mode manuel seulement
-- Pas de vérification post-déploiement
-- Pas de révocation automatique
+**Impact:**
+- Deployment in manual mode only
+- No post-deployment verification
+- No automatic revocation
 
-**Correction :**
-1. Allez au détail du service
-2. Cliquez **Éditer**
-3. À l'étape 2, cliquez **Configurer le token**
-4. Saisissez le token API valide
-5. Validez
+**Fix:**
+1. Go to the service detail
+2. Click **Edit**
+3. At step 2, click **Configure token**
+4. Enter the valid API token
+5. Validate
 
-### Fichier clef YubiKey à sauvegarder
+### YubiKey File to Back Up
 
 ```
 HardwareKeyHandleNotBackedUp
 ```
 
-**Signification :** clef SK (YubiKey) dont vous n'avez pas confirmé la sauvegarde du fichier.
+**Meaning:** SK key (YubiKey) you haven't confirmed backing up the file.
 
-**Risque :** si le YubiKey est perdu ou détruit, vous ne pouvez pas récupérer la clef.
+**Risk:** if the YubiKey is lost or destroyed, you can't recover the key.
 
-**Correction :**
-1. Allez au détail de la clef SK
-2. Notez le chemin du fichier clef privée (ex : `~/.ssh/id_sshive_github_sk`)
-3. Cliquez **Compris — j'ai sauvegardé**
-4. L'alerte disparaît
+**Fix:**
+1. Go to the SK key detail
+2. Note the path to the private key file (ex: `~/.ssh/id_sshive_github_sk`)
+3. Click **Understood — I've backed up**
+4. The alert disappears
 
-## Vue diagnostique
+## Diagnostic View
 
-![Page Santé de SSHive — vue diagnostique avec tuiles ok/warning/critical et liste priorisée](../../../assets/screenshots/health-page.png)
+![SSHive Health page — diagnostic view with ok/warning/critical tiles and prioritized list](../../../assets/screenshots/health-page.png)
 
-*Vue diagnostique : les services sont regroupés par niveau de criticité, les problèmes les plus urgents en tête de liste.*
+*Diagnostic view: services are grouped by criticality level, most urgent problems at the top of the list.*
 
-La page **Santé** affiche une table avec :
+The **Health** page displays a table with:
 
-| Colonne | Signification |
-|---------|--------------|
-| Service | Nom du service |
+| Column | Meaning |
+|--------|---------|
+| Service | Service name |
 | Type | GitHub, GitLab, SSH, etc. |
-| Santé | Pastille + niveau (ok/info/warning/critical) |
-| Clef | Fingerprint de la clef attachée (ou "—") |
-| Âge | Jours depuis génération (ex : "45 jours") |
-| Protection | ✓ passphrase / ⚠ pas de passphrase |
-| Token API | ✓ valide / ⚠ absent / ✗ invalide (GitHub/GitLab only) |
-| Déploiement | ✓ ok / ⚠ en attente / ✗ erreur |
+| Health | Badge + level (ok/info/warning/critical) |
+| Key | Fingerprint of attached key (or "—") |
+| Age | Days since generation (ex: "45 days") |
+| Protection | ✓ passphrase / ⚠ no passphrase |
+| API Token | ✓ valid / ⚠ absent / ✗ invalid (GitHub/GitLab only) |
+| Deployment | ✓ ok / ⚠ pending / ✗ error |
 
-Cliquez sur une ligne pour voir le détail complet du service et les actions disponibles.
+Click on a row to see the full service detail and available actions.
 
-## Alertes en temps réel
+## Real-time Alerts
 
-### Alerte santé critique
+### Critical Health Alert
 
-Si l'un de vos services atteint **critical**, une pastille **pulsante rouge** apparaît dans la barre latérale, à côté de **Santé**. Cela vous avertit immédiatement.
+If one of your services reaches **critical**, a **pulsing red badge** appears in the sidebar next to **Health**. This warns you immediately.
 
-L'alerte disparaît quand tous les services sont en ok/info/warning.
+The alert disappears when all services are ok/info/warning.
 
-## Configurer les seuils
+## Configure Thresholds
 
-Allez à **Paramètres** → **Sécurité** pour ajuster :
+Go to **Settings** → **Security** to adjust:
 
-- **Rotation warning threshold** (défaut 90 jours) — nombre de jours avant qu'une clef passe en warning
-- **Minimum passphrase length** (défaut 12 caractères) — longueur minimale requise pour les passphrases
+- **Rotation warning threshold** (default 90 days) — number of days before a key becomes warning
+- **Minimum passphrase length** (default 12 characters) — minimum required passphrase length
 
-## Audit complet
+## Complete Audit
 
-Consultez le journal d'audit pour voir toutes les actions :
+Check the audit log to see all actions:
 
 ```bash
 cat ~/.config/sshive/audit.log
 ```
 
-Exemple :
+Example:
 
 ```
 2026-05-11T14:35:22Z [sshive] Generated SSH key ed25519 for service GitHub
@@ -199,23 +199,23 @@ Exemple :
 2026-05-12T09:10:33Z [sshive] Revoked key from GitLab
 ```
 
-## Bonnes pratiques
+## Best Practices
 
-**Consulter Santé régulièrement** — chaque semaine, vérifiez la page Santé pour détecter les alertes.
+**Check Health regularly** — each week, review the Health page to spot alerts.
 
-**Réagir aux avertissements** — une alerte warning signifie que vous devez agir dans les prochains jours.
+**Act on warnings** — a warning means you need to take action in the next few days.
 
-**Rotations planifiées** — ne pas attendre que le seuil soit atteint ; renouveler les clefs tous les 60-90 jours pour une meilleure sécurité.
+**Planned rotations** — don't wait for the threshold; renew keys every 60-90 days for better security.
 
-**Passphrases fortes** — toujours >= 12 caractères, idéalement 16+ (phrases de passe conseillées).
+**Strong passphrases** — always >= 12 characters, ideally 16+ (passphrases recommended).
 
-**Sauvegarde YubiKey** — après générer une SK-Ed25519, marquez immédiatement comme sauvegardée pour éviter les faux positifs.
+**YubiKey backup** — after generating an SK-Ed25519, mark as backed up immediately to avoid false positives.
 
-**Zéro critical en production** — s'il y a un service critical, c'est bloquant ; mettez en place une rotation pour le résoudre.
+**Zero critical in production** — if there's a critical service, it's blocking; implement a rotation to resolve it.
 
 ---
 
-Voir aussi :
-- [Services](/guide/services/) — créer et gérer les services
-- [Clefs SSH](/guide/keys/) — générer et renouveler les clefs
-- [Tokens API](/guide/tokens/) — configurer les tokens GitHub/GitLab
+See also:
+- [Services](/guide/services/) — create and manage services
+- [SSH Keys](/guide/keys/) — generate and renew keys
+- [API Tokens](/guide/tokens/) — configure GitHub/GitLab tokens

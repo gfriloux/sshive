@@ -1,188 +1,188 @@
 ---
 title: Services
-description: Créer et gérer des services SSH dans SSHive.
+description: Create and manage SSH services in SSHive.
 ---
 
-Un **service** dans SSHive représente une destination SSH (GitHub, GitLab, un serveur) et l'une de vos clefs SSH qui y est déployée.
+A **service** in SSHive represents an SSH destination (GitHub, GitLab, a server) and one of your SSH keys deployed to it.
 
-## Types de services
+## Service Types
 
-SSHive supporte 4 types de services, chacun avec ses propres caractéristiques :
+SSHive supports 4 service types, each with its own characteristics:
 
 ### GitHub
 
-Autorise la gestion des clefs via l'API GitHub.
+Allows key management via GitHub API.
 
-**Configuration requise :**
-- **Hostname** : `github.com` (auto-rempli)
-- **Token API** : `admin:public_key` scope
-- **Mode de déploiement** : Automatique (via API) ou Guidé
+**Required configuration:**
+- **Hostname**: `github.com` (auto-filled)
+- **API Token**: `admin:public_key` scope
+- **Deployment mode**: Automatic (via API) or Guided
 
-**Avantages :**
-- Déploiement automatique via API
-- Vérification post-déploiement (SSH)
-- Révocation simplifiée
+**Benefits:**
+- Automatic deployment via API
+- Post-deployment verification (SSH)
+- Simplified revocation
 
 ### GitLab.com
 
-Autorise la gestion des clefs via l'API GitLab public.
+Allows key management via public GitLab API.
 
-**Configuration requise :**
-- **Hostname** : `gitlab.com` (auto-rempli)
-- **Token API** : `api` scope
-- **Mode de déploiement** : Automatique (via API) ou Guidé
+**Required configuration:**
+- **Hostname**: `gitlab.com` (auto-filled)
+- **API Token**: `api` scope
+- **Deployment mode**: Automatic (via API) or Guided
 
-**Avantages :**
-- Déploiement automatique via API
-- Vérification post-déploiement (SSH)
-- Révocation simplifiée
+**Benefits:**
+- Automatic deployment via API
+- Post-deployment verification (SSH)
+- Simplified revocation
 
-### GitLab auto-hébergé
+### Self-hosted GitLab
 
-Autorise la gestion des clefs pour une instance GitLab privée.
+Allows key management for a private GitLab instance.
 
-**Configuration requise :**
-- **Hostname** : URL de base de votre instance GitLab (ex : `https://gitlab.example.com`)
-- **Token API** : `api` scope
-- **Mode de déploiement** : Automatique (via API) ou Guidé
+**Required configuration:**
+- **Hostname**: Base URL of your GitLab instance (ex: `https://gitlab.example.com`)
+- **API Token**: `api` scope
+- **Deployment mode**: Automatic (via API) or Guided
 
-**Avantages :**
-- Même API que GitLab.com, mais sur votre serveur
-- Déploiement automatique si l'API est accessible
-- Sinon, basculez en mode Guidé
+**Benefits:**
+- Same API as GitLab.com, but on your server
+- Automatic deployment if API is accessible
+- Otherwise, switch to Guided mode
 
-### SSH générique
+### Generic SSH
 
-Pour tout serveur SSH standard (Linux, BSD, vos machines…).
+For any standard SSH server (Linux, BSD, your machines…).
 
-**Configuration requise :**
-- **Hostname** : adresse IP ou nom de domaine
-- **Username** : utilisateur SSH (ex : `deploy`, `ec2-user`)
-- **Port** : port SSH (défaut 22)
-- **Mode de déploiement** : Automatique (`ssh-copy-id`), Guidé (copier la clef), ou Géré externalement
+**Required configuration:**
+- **Hostname**: IP address or domain name
+- **Username**: SSH user (ex: `deploy`, `ec2-user`)
+- **Port**: SSH port (default 22)
+- **Deployment mode**: Automatic (`ssh-copy-id`), Guided (copy key), or Externally Managed
 
-**Avantages :**
-- Flexible pour tout serveur SSH
-- Déploiement manuel ou automatique
-- Support des CM externes (NixOS, Ansible)
+**Benefits:**
+- Flexible for any SSH server
+- Manual or automatic deployment
+- Support for external CM (NixOS, Ansible)
 
-![Vue principale de SSHive — liste des services et panneau de détail](../../../assets/screenshots/detail-panel.png)
+![SSHive main view — service list and detail panel](../../../assets/screenshots/detail-panel.png)
 
-*Panneau de détail d'un service : health banner, fingerprint en amber, historique des déploiements et actions disponibles.*
+*Detail panel of a service: health banner, amber fingerprint, deployment history and available actions.*
 
-## Créer un service
+## Create a Service
 
-1. Cliquez **"Ajouter un service"** dans la liste vide, ou le bouton **+** de la barre latérale
-2. **Étape 1 : Type de service**
-   - Sélectionnez le type : GitHub, GitLab, GitLab self-hosted ou SSH générique
-3. **Étape 2 : Paramètres**
-   - Entrez un **nom unique** pour le service
-   - SSH générique : remplissez **hostname**, **utilisateur SSH**, **port** (défaut 22)
-   - GitLab self-hosted : remplissez l'**URL de l'instance**
-   - GitHub/GitLab : saisissez le **token API** (optionnel — configurable plus tard)
-4. **Étape 3 : Mode de déploiement**
-   - Sélectionnez Automatique, Guidé ou CM externe
-   - Vérifiez le récapitulatif puis cliquez **Créer le service**
+1. Click **"Add a service"** in the empty list, or the **+** button in the sidebar
+2. **Step 1: Service type**
+   - Select the type: GitHub, GitLab, Self-hosted GitLab or Generic SSH
+3. **Step 2: Parameters**
+   - Enter a **unique name** for the service
+   - Generic SSH: fill in **hostname**, **SSH user**, **port** (default 22)
+   - Self-hosted GitLab: fill in the **instance URL**
+   - GitHub/GitLab: enter the **API token** (optional — can be configured later)
+4. **Step 3: Deployment mode**
+   - Select Automatic, Guided, or External CM
+   - Review the summary then click **Create service**
 
-Le service est créé **sans clef SSH attachée**. L'étape suivante consiste à lui associer une clef.
+The service is created **without an attached SSH key**. The next step is to associate a key with it.
 
-## Associer une clef SSH à un service
+## Attach an SSH Key to a Service
 
-Deux chemins sont disponibles depuis le **panneau de détail** du service (cliquez sur le service dans la liste) :
+Two paths are available from the **service detail panel** (click on the service in the list):
 
-### Générer une nouvelle clef
+### Generate a new key
 
-Cliquez **"Générer une clef"** dans la page **Clefs** en sélectionnant le service cible. Cela crée une paire ed25519 (ou sk-ed25519 pour YubiKey), chiffrée par passphrase, et l'attache immédiatement au service.
+Click **"Generate a key"** on the **Keys** page while selecting the target service. This creates an ed25519 pair (or sk-ed25519 for YubiKey), encrypted with a passphrase, and immediately attaches it to the service.
 
-### Attacher une clef existante
+### Attach an existing key
 
-Si vous avez déjà une clef gérée par SSHive (visible dans la page **Clefs**) non encore associée à un service :
+If you already have a key managed by SSHive (visible on the **Keys** page) not yet attached to a service:
 
-1. Sélectionnez le service dans la liste — le panneau de détail s'ouvre
-2. Dans la section **Clef SSH**, cliquez **"Attacher une clef existante"**
-3. Une liste affiche les clefs disponibles avec leur fingerprint et date de création
-4. Cliquez sur la clef souhaitée — elle est immédiatement liée au service
+1. Select the service from the list — the detail panel opens
+2. In the **SSH Key** section, click **"Attach an existing key"**
+3. A list shows available keys with their fingerprint and creation date
+4. Click on the desired key — it's immediately linked to the service
 
 :::note
-Seules les clefs **gérées** (avec clef privée dans `~/.ssh/`) peuvent être attachées depuis ce sélecteur. Les clefs découvertes par scan sans clef privée ne sont pas proposées.
+Only **managed** keys (with private key in `~/.ssh/`) can be attached from this selector. Discovered keys without a private key are not offered.
 :::
 
-## Éditer un service
+## Edit a Service
 
-1. Sélectionnez le service dans la liste
-2. Cliquez **Éditer** en haut du détail
-3. Modifiez les champs souhaités (hostname, username, token API, etc.)
-4. Les changements sont sauvegardés automatiquement au clic **Valider**
+1. Select the service from the list
+2. Click **Edit** at the top of the detail
+3. Modify the desired fields (hostname, username, API token, etc.)
+4. Changes are automatically saved when you click **Validate**
 
-**Important** : l'édition conserve la clef attachée, l'historique de déploiements et les rotations. Seuls les champs du formulaire sont modifiés.
+**Important**: editing preserves the attached key, deployment history, and rotations. Only the form fields are modified.
 
-## Supprimer un service
+## Delete a Service
 
-1. Sélectionnez le service
-2. Cliquez **Supprimer** en haut du détail
-3. Confirmez la suppression
+1. Select the service
+2. Click **Delete** at the top of the detail
+3. Confirm the deletion
 
-**Note** : la clef SSH n'est pas supprimée, seulement le service. La clef reste disponible pour d'autres services.
+**Note**: the SSH key is not deleted, only the service. The key remains available for other services.
 
-## États et santé
+## Status and Health
 
-Chaque service affiche une **pastille de santé** (point coloré) indiquant son état :
+Each service displays a **health badge** (colored dot) indicating its state:
 
-- **✓ ok (vert)** — clef déployée, non protégée, token API valide (si applicable)
-- **ⓘ info (bleu)** — clef présente mais non protégée par passphrase
-- **⚠ warning (orange)** — clef manquante, token absent, rotation recommandée
-- **✗ critical (rouge)** — clef manquante + rotation dépassée, ou perte de token API
+- **✓ ok (green)** — key deployed, protected, API token valid (if applicable)
+- **ⓘ info (blue)** — key present but not protected by passphrase
+- **⚠ warning (orange)** — key missing, token absent, rotation recommended
+- **✗ critical (red)** — key missing + rotation overdue, or loss of API token
 
-Consultez la page [Santé et diagnostics](/guide/health/) pour la liste complète des raisons.
+See the [Health and Diagnostics](/guide/health/) page for the complete list of reasons.
 
-## Déployer une clef
+## Deploy a Key
 
-Une fois le service créé, vous devez **déployer** la clef :
+Once the service is created, you must **deploy** the key:
 
-1. Sélectionnez le service
-2. Cliquez **Déployer** dans le panneau de détail
-3. SSHive exécute le déploiement selon le mode choisi :
-   - **Automatique** — API GitHub/GitLab ou `ssh-copy-id`
-   - **Guidé** — copie la commande, vous la collez dans le terminal
-   - **Géré externalement** — affiche la clef publique à mettre dans votre CM
+1. Select the service
+2. Click **Deploy** in the detail panel
+3. SSHive executes the deployment according to the chosen mode:
+   - **Automatic** — GitHub/GitLab API or `ssh-copy-id`
+   - **Guided** — shows command, you paste it in terminal
+   - **Externally Managed** — displays key to put in your CM
 
-4. Une vérification post-déploiement confirme que la clef est acceptée
-5. Vous verrez **"✓ Connexion vérifiée"** si tout est OK
+4. Post-deployment verification confirms the key is accepted
+5. You'll see **"✓ Connection verified"** if all is OK
 
-## Voir l'historique de déploiements
+## View Deployment History
 
-Dans le panneau de détail, la section **DÉPLOIEMENTS** liste tous les déploiements et révocations passés avec timestamps.
+In the detail panel, the **DEPLOYMENTS** section lists all past deployments and revocations with timestamps.
 
-## Révoquer une clef
+## Revoke a Key
 
-1. Sélectionnez le service
-2. Cherchez la clef dans la section **Clefs SSH** du détail
-3. Cliquez **Révoquer**
+1. Select the service
+2. Find the key in the **SSH Keys** section of the detail
+3. Click **Revoke**
 
-Pour GitHub/GitLab, cela appelle l'API pour supprimer la clef. Pour SSH générique, cela l'enlève de `~/.ssh/authorized_keys` sur le serveur.
+For GitHub/GitLab, this calls the API to delete the key. For Generic SSH, this removes it from `~/.ssh/authorized_keys` on the server.
 
-## Déployer une clef existante
+## Deploy an Existing Key
 
-Si vous avez une clef SSHive non déployée sur un service :
+If you have an SSHive key not deployed on a service:
 
-1. Sélectionnez le service
-2. Cherchez la clef dans la section **Clefs SSH disponibles**
-3. Cliquez **Sélectionner** pour l'attacher
-4. Cliquez **Déployer** pour commencer le déploiement
+1. Select the service
+2. Find the key in the **Available SSH Keys** section
+3. Click **Select** to attach it
+4. Click **Deploy** to start deployment
 
-## Astuces et bonnes pratiques
+## Tips and Best Practices
 
-**Une clef par service** — toujours préférer générer une nouvelle clef pour chaque service plutôt que de réutiliser la même clef partout.
+**One key per service** — always prefer generating a new key for each service rather than reusing the same key everywhere.
 
-**Noms explicites** — utilisez des noms de service clairs comme `GitHub Production` plutôt que `srv1`.
+**Explicit names** — use clear service names like `GitHub Production` rather than `srv1`.
 
-**Documentation locale** — notez le purpose de chaque service (ex : "Déploiements CI/CD" vs "Access personnel").
+**Local documentation** — note the purpose of each service (ex: "CI/CD deployments" vs "Personal access").
 
-**Rotation régulière** — configurez un délai d'alerte de rotation (par défaut 90 jours) et examinez la page Santé régulièrement.
+**Regular rotation** — set a rotation alert delay (default 90 days) and check the Health page regularly.
 
 ---
 
-Voir aussi :
-- [Clefs SSH](/guide/keys/) — gestion des clefs
-- [Déploiement](/guide/deployment/) — modes de déploiement détaillés
-- [Santé](/guide/health/) — diagnostics et alertes
+See also:
+- [SSH Keys](/guide/keys/) — key management
+- [Deployment](/guide/deployment/) — detailed deployment modes
+- [Health](/guide/health/) — diagnostics and alerts

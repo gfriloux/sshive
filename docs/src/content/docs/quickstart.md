@@ -1,101 +1,101 @@
 ---
-title: Démarrage rapide
-description: Ajouter un premier service GitHub en 5 minutes.
+title: Quick Start
+description: Add your first GitHub service in 5 minutes.
 ---
 
-Ce guide vous montre comment ajouter votre premier service (GitHub) et déployer une clef SSH en 5 minutes.
+This guide shows you how to add your first service (GitHub) and deploy an SSH key in 5 minutes.
 
-## Étape 1 : Lancez SSHive
+## Step 1: Launch SSHive
 
 ```bash
 sshive
 ```
 
-Vous verrez l'interface avec trois colonnes : **Navigation** (gauche), **Services** (centre), **Détail** (droite).
+You'll see the interface with three columns: **Navigation** (left), **Services** (center), **Detail** (right).
 
-## Étape 2 : Créez un nouveau service
+## Step 2: Create a new service
 
-1. Cliquez sur **"Ajouter mon premier service"** dans la liste des services
-2. Remplissez les informations du service :
-   - **Nom** : `GitHub` (ou n'importe quel nom unique)
-   - **Type** : `GitHub`
-   - **Hostname** : `github.com` (auto-rempli)
+1. Click **"Add my first service"** in the services list
+2. Fill in the service information:
+   - **Name**: `GitHub` (or any unique name)
+   - **Type**: `GitHub`
+   - **Hostname**: `github.com` (auto-filled)
 
-3. Cliquez **Suivant**
+3. Click **Next**
 
-## Étape 3 : Configurez le déploiement
+## Step 3: Configure deployment
 
-1. Choisissez **Mode automatique** — SSHive utilisera l'API GitHub pour déployer
-2. Collez votre **token GitHub** avec le scope `admin:public_key`
+1. Choose **Automatic mode** — SSHive will use GitHub API to deploy
+2. Paste your **GitHub token** with the `admin:public_key` scope
 
-**Comment obtenir un token GitHub :**
+**How to get a GitHub token:**
 
-- Allez à [github.com/settings/tokens](https://github.com/settings/tokens)
-- Cliquez **Generate new token (classic)**
-- Scopes : cochez uniquement **`admin:public_key`**
-- Générez et copiez le token dans SSHive
+- Go to [github.com/settings/tokens](https://github.com/settings/tokens)
+- Click **Generate new token (classic)**
+- Scopes: check only **`admin:public_key`**
+- Generate and copy the token into SSHive
 
-3. Cliquez **Suivant**
+3. Click **Next**
 
-## Étape 4 : Générez une clef SSH
+## Step 4: Generate an SSH key
 
-1. Choisissez **Générer une nouvelle clef**
-2. Type : **ed25519** (par défaut, recommandé)
-3. Passphrase : saisissez une phrase de passe ≥ 12 caractères
-4. Cliquez **Générer**
+1. Choose **Generate a new key**
+2. Type: **ed25519** (default, recommended)
+3. Passphrase: enter a passphrase ≥ 12 characters
+4. Click **Generate**
 
-SSHive chiffre la passphrase avec GPG et génère la clef. Vous verrez le fingerprint affiché.
+SSHive encrypts the passphrase with GPG and generates the key. You'll see the fingerprint displayed.
 
-## Étape 5 : Déployez la clef
+## Step 5: Deploy the key
 
-1. Cliquez **Déployer**
-2. SSHive envoie la clef à GitHub via l'API
-3. Une vérification post-déploiement est effectuée
-4. Un message "✓ Connexion vérifiée" confirme le succès
+1. Click **Deploy**
+2. SSHive sends the key to GitHub via API
+3. Post-deployment verification is performed
+4. A "✓ Connection verified" message confirms success
 
-Bravo ! Votre première clef est maintenant déployée sur GitHub.
+Congratulations! Your first key is now deployed on GitHub.
 
-## Étape 6 : Vérifiez la santé
+## Step 6: Check health
 
-1. Cliquez sur **Santé** dans la barre latérale
-2. Vous verrez votre service GitHub listé avec le statut **ok** (point vert)
+1. Click **Health** in the sidebar
+2. You'll see your GitHub service listed with **ok** status (green dot)
 
-## Prochaines étapes
+## Next Steps
 
-- **Ajouter un serveur SSH** — voir [Services](/guide/services/)
-- **Comprendre les modes de déploiement** — voir [Déploiement](/guide/deployment/)
-- **Renouveler une clef** — voir [Clefs SSH](/guide/keys/)
-- **Gérer les tokens API** — voir [Tokens API](/guide/tokens/)
+- **Add an SSH server** — see [Services](/guide/services/)
+- **Understand deployment modes** — see [Deployment](/guide/deployment/)
+- **Renew a key** — see [SSH Keys](/guide/keys/)
+- **Manage API tokens** — see [API Tokens](/guide/tokens/)
 
-## Astuces
+## Tips
 
-### Tester avec un service SSH générique (pas de compte public requis)
+### Test with a generic SSH service (no public account required)
 
-Si vous n'avez pas encore de compte GitHub, vous pouvez tester avec un service SSH générique :
+If you don't have a GitHub account yet, you can test with a generic SSH service:
 
-1. Créez un nouveau service avec type **SSH générique**
-2. Remplissez les informations de connexion :
-   - **Hostname** : `127.0.0.1` ou votre machine locale
-   - **Username** : `root`
-   - **Port** : `22`
-3. Générez et déployez une clef comme ci-dessus
+1. Create a new service with type **Generic SSH**
+2. Fill in the connection information:
+   - **Hostname**: `127.0.0.1` or your local machine
+   - **Username**: `root`
+   - **Port**: `22`
+3. Generate and deploy a key as above
 
-### Copier une clef publique existante
+### Copy an existing key
 
-Si vous avez déjà des clefs dans `~/.ssh/`, SSHive les découvre automatiquement. Vous pouvez les rattacher à un service sans les régénérer :
+If you already have keys in `~/.ssh/`, SSHive discovers them automatically. You can attach them to a service without regenerating:
 
-1. Ouvrez le détail du service
-2. Cherchez la clef dans la liste **Clefs SSH disponibles**
-3. Cliquez **Sélectionner** pour l'attacher
+1. Open the service detail
+2. Find the key in the **Available SSH Keys** list
+3. Click **Select** to attach it
 
-### YubiKey (clef de sécurité matérielle)
+### YubiKey (hardware security key)
 
-Pour générer une clef sk-ed25519 (requiert un YubiKey ou autre FIDO2 USB) :
+To generate an sk-ed25519 key (requires a YubiKey or other FIDO2 USB device):
 
-1. Dans l'étape de génération de clef, choisissez **SK-Ed25519** au lieu de ed25519
-2. Suivez les instructions pour appuyer sur le bouton YubiKey quand demandé
-3. La clef privée est sauvegardée dans `~/.ssh/` — sauvegardez le fichier en lieu sûr
+1. In the key generation step, choose **SK-Ed25519** instead of ed25519
+2. Follow the instructions to press the YubiKey button when prompted
+3. The private key is saved in `~/.ssh/` — save the file somewhere safe
 
 ---
 
-Vous êtes prêt. Consultez les [Guides détaillés](/guide/services/) pour en savoir plus sur chaque fonctionnalité.
+You're ready. Check the [Detailed Guides](/guide/services/) for more information on each feature.
